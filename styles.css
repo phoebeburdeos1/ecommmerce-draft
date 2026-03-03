@@ -1,0 +1,30 @@
+:root{
+  --header-height: 72px;
+  --container-width: 1100px;
+  --accent: #1573ff;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,Arial;margin:0;color:#0b1220;background:#f6f8fb}
+.container{max-width:var(--container-width);margin:0 auto;padding:0 20px}
+
+/* fixed header */
+.site-header{
+  position:fixed;top:0;left:0;right:0;height:var(--header-height);
+  background:#fff;border-bottom:1px solid rgba(11,18,32,0.06);z-index:60;
+  display:flex;align-items:center;
+}
+.site-header .container{display:flex;align-items:center;justify-content:space-between}
+.main-nav a{margin-left:20px;color:#1f2d3d;text-decoration:none;font-weight:600}
+
+/* hero */
+.hero{margin-top:var(--header-height);padding:48px 0;background:linear-gradient(180deg,#0b2b4a22,transparent)}
+.hero h1{font-size:40px;margin:0 0 8px}
+
+/* about section: prevent header overlap when scrolled to */
+.about{padding:56px 0}
+.about{scroll-margin-top:calc(var(--header-height) + 24px)} /* key for offset */
+
+/* footer */
+.site-footer{padding:40px 0;background:#fff;border-top:1px solid rgba(11,18,32,0.04)}
+.site-footer .footer-nav a{margin-right:16px;color:#556777;text-decoration:none}

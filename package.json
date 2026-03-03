@@ -1,0 +1,22 @@
+{
+    "private": true,
+    "scripts": {
+        "dev": "npm run development",
+        "development": "mix",
+        "watch": "mix watch",
+        "watch-poll": "mix watch -- --watch-options-poll=1000",
+        "hot": "mix watch --hot",
+        "prod": "npm run production",
+        "production": "mix --production",
+        "frontend:install": "cd frontend && npm install",
+        "frontend:dev": "cd frontend && npm run dev",
+        "frontend:build": "cd frontend && npm run build",
+        "frontend:start": "cd frontend && npm run start"
+    },
+    "devDependencies": {
+        "axios": "^0.21",
+        "laravel-mix": "^6.0.6",
+        "lodash": "^4.17.19",
+        "postcss": "^8.1.14"
+    }
+}
