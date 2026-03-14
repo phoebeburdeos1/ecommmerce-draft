@@ -1,7 +1,10 @@
 $bg: #f3f4f6; $text: #1f2937; $muted: #6b7280; $brand:#111827; $primary:#2563eb; $card:#ffffff; $border:#e5e7eb;
 *{box-sizing:border-box}
-body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; background:$bg; color:$text}
+html{overflow-x:hidden}
+body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; background:$bg; color:$text; overflow-x:hidden}
 .container{max-width:1280px;margin:0 auto;padding:0 1rem;min-height:60vh}
+.container img{max-width:100%;height:auto}
+@media (max-width: 640px){.container{padding:0 0.75rem}}
 .btn{display:inline-block;padding:.6rem 1rem;border-radius:.375rem;background:#e5e7eb;color:#111;text-decoration:none}
 .btn.primary{background:$primary;color:#fff}
 .navbar{background:#fff;border-bottom:1px solid $border;position:sticky;top:0;z-index:10}
@@ -26,6 +29,24 @@ body{margin:0;font-family:system-ui, -apple-system, Segoe UI, Roboto, Arial; bac
 .nav-logout{background:none;border:none;cursor:pointer;font-size:inherit;color:inherit;padding:0 8px}
 .nav-messages{margin-left:.5rem;color:$muted;text-decoration:none;font-size:14px}
 .nav-messages:hover{color:$text}
+/* Mobile navbar */
+.nav-toggle{display:none;background:none;border:none;cursor:pointer;padding:8px;font-size:1.25rem;line-height:1;color:$brand}
+@media (max-width: 768px){
+  .nav-toggle{display:inline-flex;align-items:center;justify-content:center}
+  .navbar .nav-inner{flex-wrap:wrap;padding:.75rem 1rem;gap:.75rem}
+  .nav-links{order:2;width:100%;display:none;flex-direction:column;gap:.5rem;padding:.5rem 0;border-top:1px solid $border;margin-top:.25rem}
+  .navbar .nav-links.open{display:flex}
+  .nav-center{order:3;width:100%;flex:1 1 100%;justify-content:stretch}
+  .nav-search{flex:1;min-width:0}
+  .nav-search input{width:100%;min-width:0}
+  .nav-breadcrumb{display:none}
+  .nav-actions{order:1}
+}
+@media (max-width: 480px){
+  .navbar .nav-inner{padding:.6rem .75rem}
+  .navbar .brand-name{font-size:.95rem}
+  .nav-actions a,.nav-actions .nav-messages{font-size:13px;padding:.25rem}
+}
 .footer{background:#111;color:#9ca3af;margin-top:3rem}
 .footer .footer-inner{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:2.5rem;padding:3rem 1.25rem 2rem}
 .footer-brand .footer-logo{display:inline-flex;align-items:center;gap:.4rem;color:#fff;text-decoration:none;font-weight:600;margin-bottom:.75rem}

@@ -38,6 +38,7 @@ export default function Navbar() {
   const isDashboard = router.pathname.startsWith('/dashboard');
 
   const cartCount = items.reduce((sum, i) => sum + i.quantity, 0);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   return (
     <header className="navbar">
@@ -46,18 +47,30 @@ export default function Navbar() {
           <span className="brand-n">N</span>
           <span className="brand-name">urbanNxt</span>
         </Link>
-        <nav className="nav-links">
+        {!user && (
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label="Toggle menu"
+            onClick={() => setMenuOpen((o) => !o)}
+          >
+            {menuOpen ? '✕' : '☰'}
+          </button>
+        )}
+        <nav className={`nav-links ${menuOpen ? 'open' : ''}`}>
           {!user && (
             <>
               <Link
                 href="/about"
                 className={isAbout ? 'active' : ''}
+                onClick={() => setMenuOpen(false)}
               >
                 About us
               </Link>
               <Link
                 href="/#contact"
                 className={isHomeContact ? 'active' : ''}
+                onClick={() => setMenuOpen(false)}
               >
                 Contact us
               </Link>
