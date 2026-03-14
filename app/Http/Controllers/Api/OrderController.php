@@ -75,4 +75,33 @@ class OrderController extends Controller
             'order' => $order->load('items'),
         ], 201);
     }
+
+    /**
+     * Customer cancels their own order (only if still pending/confirmed/processing).
+     */
+    public function updateStatus(Request $request, $id)
+    {
+        $order = Order::where('customer_id', $request->user()->id)->findOrFail($id);
+        $validated = $request->validate(['status' => 'required|string|in:cancelled,delivered']);
+
+        $status = strtolower($validated['status']);
+        $current = strtolower($order->status ?? 'pending');
+
+        // Customer can only cancel; shipped/delivered are for seller/admin
+        if ($status === 'cancelled') {
+            if (!in_array($current, ['pending', 'confirmed', 'processing'], true)) {
+                return response()->json(['message' => 'Order can no longer be cancelled.'], 422);
+            }
+            $order->update(['status' => 'cancelled']);
+            return response()->json(['message' => 'Order cancelled.', 'order' => $order->fresh('items.product')], 200);
+        }
+
+        // Allow customer to mark as delivered (e.g. "I received it") for their own order
+        if ($status === 'delivered' && $current === 'shipped') {
+            $order->update(['status' => 'delivered']);
+            return response()->json(['message' => 'Order marked as delivered.', 'order' => $order->fresh('items.product')], 200);
+        }
+
+        return response()->json(['message' => 'Invalid status update.'], 422);
+    }
 }

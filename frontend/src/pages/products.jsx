@@ -37,7 +37,7 @@ export default function Products() {
               productImageUrl(p.image) ||
               'https://placehold.co/400x500?text=' +
                 encodeURIComponent(p.name || 'Product'),
-            sizes: p.sizes || ['S', 'M', 'L', 'XL'],
+            sizes: Array.isArray(p.sizes) ? p.sizes : ['S', 'M', 'L', 'XL'],
           })),
         );
       } catch (e) {
@@ -198,25 +198,27 @@ export default function Products() {
                   <Link href={`/product/${product.id}`}><h3>{product.name}</h3></Link>
                   <p className={styles.category}>{product.category}</p>
 
-                  <div className={styles.priceRow}>
-                    <span className={styles.price}>${product.price.toFixed(2)}</span>
-                    {product.id % 2 === 0 && (
-                      <span className={styles.oldPrice}>${(product.price * 1.2).toFixed(2)}</span>
-                    )}
-                  </div>
-
                   <form onSubmit={(e) => handleAddToCart(e, product)}>
+                    <label className={styles.sizeLabel}>Size</label>
                     <select
-                      style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid #cbd5e0', marginBottom: '10px', fontSize: '13px' }}
+                      className={styles.sizeSelect}
                       value={selectedSize[product.id] || ''}
                       onChange={(e) => handleSizeChange(product.id, e.target.value)}
                       required
                     >
                       <option value="">Select Size</option>
-                      {product.sizes.map(size => (
+                      {(Array.isArray(product.sizes) ? product.sizes : ['S', 'M', 'L', 'XL']).map(size => (
                         <option key={size} value={size}>{size}</option>
                       ))}
                     </select>
+
+                    <div className={styles.priceRow}>
+                      <span className={styles.price}>₱{product.price.toFixed(2)}</span>
+                      {product.id % 2 === 0 && (
+                        <span className={styles.oldPrice}>₱{(product.price * 1.2).toFixed(2)}</span>
+                      )}
+                    </div>
+
                     <button type="submit" className={styles.addToCart}>
                       Add to Cart
                     </button>

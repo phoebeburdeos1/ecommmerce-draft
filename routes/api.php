@@ -8,19 +8,9 @@ use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\Api\OrderController;
 use App\Http\Controllers\Api\SellerProductController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\ConversationController;
+use App\Http\Controllers\Api\SellerOrderController;
 
-/*
-|--------------------------------------------------------------------------
-| API Routes
-|--------------------------------------------------------------------------
-|
-| Here is where you can register API routes for your application. These
-| routes are loaded by the RouteServiceProvider within a group which
-| is assigned the "api" middleware group. Enjoy building your API!
-|
-*/
-
-// Public auth endpoints
 Route::post('/auth/register', [AuthController::class, 'register'])->name('api.auth.register');
 Route::post('/auth/login', [AuthController::class, 'login'])->name('api.auth.login');
 
@@ -39,6 +29,7 @@ Route::get('/categories', [CategoryController::class, 'index']);
 Route::middleware('auth:sanctum')->group(function () {
     Route::get('/orders', [OrderController::class, 'customerOrders']);
     Route::post('/orders', [OrderController::class, 'store']);
+    Route::patch('/orders/{id}/status', [OrderController::class, 'updateStatus']);
 });
 
 // Protected seller endpoints
@@ -48,7 +39,18 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/products', [SellerProductController::class, 'store']);
         Route::put('/products/{id}', [SellerProductController::class, 'update']);
         Route::delete('/products/{id}', [SellerProductController::class, 'destroy']);
+        Route::get('/orders', [SellerOrderController::class, 'index']);
+        Route::patch('/orders/{id}/status', [SellerOrderController::class, 'updateStatus']);
     });
+});
+
+// Messaging: seller and customer
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/conversations/unread-count', [ConversationController::class, 'unreadCount']);
+    Route::get('/conversations', [ConversationController::class, 'index']);
+    Route::get('/conversations/{id}', [ConversationController::class, 'show']);
+    Route::post('/conversations', [ConversationController::class, 'store']);
+    Route::post('/conversations/{id}/messages', [ConversationController::class, 'sendMessage']);
 });
 
 // Protected admin endpoints

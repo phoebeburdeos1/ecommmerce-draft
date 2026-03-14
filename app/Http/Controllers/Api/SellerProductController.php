@@ -5,14 +5,23 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 
 class SellerProductController extends Controller
 {
+    private function ensureSeller(Request $request)
+    {
+        if (!$request->user()->hasRole('seller')) {
+            abort(403, 'Only sellers can access this resource.');
+        }
+    }
+
     /**
      * Get seller products
      */
     public function index(Request $request)
     {
+        $this->ensureSeller($request);
         $products = Product::where('seller_id', $request->user()->id)
             ->with('category')
             ->orderBy('created_at', 'desc')
@@ -28,6 +37,7 @@ class SellerProductController extends Controller
      */
     public function store(Request $request)
     {
+        $this->ensureSeller($request);
         $validated = $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -39,7 +49,7 @@ class SellerProductController extends Controller
 
         $product = Product::create([
             'name' => $validated['name'],
-            'slug' => str_slug($validated['name']),
+            'slug' => Str::slug($validated['name']),
             'description' => $validated['description'],
             'price' => $validated['price'],
             'stock' => $validated['stock'],
@@ -59,6 +69,7 @@ class SellerProductController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $this->ensureSeller($request);
         $product = Product::where('id', $id)
             ->where('seller_id', $request->user()->id)
             ->firstOrFail();
@@ -86,6 +97,7 @@ class SellerProductController extends Controller
      */
     public function destroy(Request $request, $id)
     {
+        $this->ensureSeller($request);
         $product = Product::where('id', $id)
             ->where('seller_id', $request->user()->id)
             ->firstOrFail();

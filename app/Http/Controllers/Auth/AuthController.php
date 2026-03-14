@@ -20,15 +20,14 @@ class AuthController extends Controller
             'name' => 'required|string|max:255',
             'email' => 'required|string|email|max:255|unique:users',
             'password' => 'required|string|min:8|confirmed',
-            'role' => 'required|in:customer,seller,admin',
             'phone' => 'nullable|string|max:20',
             'address' => 'nullable|string|max:255',
         ]);
 
-        // Get role
-        $role = Role::where('name', $validated['role'])->first();
+        // Only customer accounts can be created via public signup; seller/admin are created by admin.
+        $role = Role::where('name', 'customer')->first();
         if (!$role) {
-            return response()->json(['message' => 'Invalid role'], 400);
+            return response()->json(['message' => 'Registration not available.'], 400);
         }
 
         // Create user

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import styles from '@/styles/auth.module.scss';
@@ -11,10 +12,10 @@ export default function Signup() {
     email: '',
     password: '',
     passwordConfirmation: '',
-    role: 'customer',
     phone: '',
     address: '',
   });
+  const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -37,25 +38,16 @@ export default function Signup() {
     }
 
     try {
-      const response = await register(
+      await register(
         formData.name,
         formData.email,
         formData.password,
         formData.passwordConfirmation,
-        formData.role,
+        'customer',
         formData.phone,
         formData.address
       );
-      const userRole = response.user.role.name;
-
-      // Route based on role
-      if (userRole === 'customer') {
-        router.push('/dashboard/customer');
-      } else if (userRole === 'seller') {
-        router.push('/dashboard/seller');
-      } else if (userRole === 'admin') {
-        router.push('/dashboard/admin');
-      }
+      router.push('/dashboard/customer');
     } catch (err) {
       setError(err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Signup failed. Please try again.');
     } finally {
@@ -66,9 +58,13 @@ export default function Signup() {
   return (
     <div className={styles.authContainer}>
       <div className={styles.authCard}>
-        <h1>Create Your Account</h1>
+        <div className={styles.authIconWrap}>
+          <span className={styles.authIcon} aria-hidden>👤</span>
+        </div>
+        <h1 className={styles.authTitle}>Create an account</h1>
+        <p className={styles.authSubtitle}>Enter your details to sign up as a customer.</p>
         {error && <div className={styles.error}>{error}</div>}
-        
+
         <form onSubmit={handleSubmit}>
           <div className={styles.formGroup}>
             <label htmlFor="name">Full Name</label>
@@ -85,34 +81,23 @@ export default function Signup() {
 
           <div className={styles.formGroup}>
             <label htmlFor="email">Email</label>
-            <input
-              type="email"
-              id="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="your@email.com"
-            />
+            <div className={styles.inputWrap}>
+              <span className={styles.inputIcon} aria-hidden>✉</span>
+              <input
+                type="email"
+                id="email"
+                name="email"
+                value={formData.email}
+                onChange={handleChange}
+                required
+                placeholder="Enter your email"
+                className={styles.inputWithIcon}
+              />
+            </div>
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="role">Account Type</label>
-            <select
-              id="role"
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              required
-            >
-              <option value="customer">Customer - Buy Products</option>
-              <option value="seller">Seller - Sell Products</option>
-              <option value="admin">Admin - Manage Platform</option>
-            </select>
-          </div>
-
-          <div className={styles.formGroup}>
-            <label htmlFor="phone">Phone (Optional)</label>
+            <label htmlFor="phone">Phone (optional)</label>
             <input
               type="tel"
               id="phone"
@@ -124,53 +109,69 @@ export default function Signup() {
           </div>
 
           <div className={styles.formGroup}>
-            <label htmlFor="address">Address (Optional)</label>
+            <label htmlFor="address">Address (optional)</label>
             <textarea
               id="address"
               name="address"
               value={formData.address}
               onChange={handleChange}
               placeholder="123 Main St, City, State"
-              rows="3"
+              rows="2"
             />
           </div>
 
           <div className={styles.formGroup}>
             <label htmlFor="password">Password</label>
-            <input
-              type="password"
-              id="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              placeholder="Enter a strong password"
-            />
+            <div className={styles.inputWrap}>
+              <span className={styles.inputIcon} aria-hidden>🔑</span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="password"
+                name="password"
+                value={formData.password}
+                onChange={handleChange}
+                required
+                placeholder="Create a strong password"
+                className={styles.inputWithIcon}
+              />
+              <button
+                type="button"
+                className={styles.passwordToggle}
+                onClick={() => setShowPassword((v) => !v)}
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                tabIndex={-1}
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
           </div>
 
           <div className={styles.formGroup}>
             <label htmlFor="passwordConfirmation">Confirm Password</label>
-            <input
-              type="password"
-              id="passwordConfirmation"
-              name="passwordConfirmation"
-              value={formData.passwordConfirmation}
-              onChange={handleChange}
-              required
-              placeholder="Confirm your password"
-            />
+            <div className={styles.inputWrap}>
+              <span className={styles.inputIcon} aria-hidden>🔑</span>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                id="passwordConfirmation"
+                name="passwordConfirmation"
+                value={formData.passwordConfirmation}
+                onChange={handleChange}
+                required
+                placeholder="Confirm your password"
+                className={styles.inputWithIcon}
+              />
+            </div>
           </div>
 
           <button type="submit" disabled={loading} className={styles.submitBtn}>
-            {loading ? 'Creating Account...' : 'Sign Up'}
+            {loading ? 'Creating account...' : 'Create account'}
           </button>
         </form>
 
         <p className={styles.switchMode}>
-          Already have an account? <a href="/auth/login">Login here</a>
+          Already have an account? <Link href="/auth/login">Sign in</Link>
         </p>
       </div>
     </div>
   );
 }
-

@@ -252,6 +252,32 @@
       }
     }
 
+    .category {
+      font-size: 0.8rem;
+      color: #6b7280;
+      margin: 0 0 0.5rem;
+    }
+
+    .sizeLabel {
+      display: block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      color: #4a5568;
+      margin-bottom: 0.25rem;
+      text-transform: uppercase;
+    }
+
+    .sizeSelect {
+      width: 100%;
+      padding: 0.5rem 0.6rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      background: #fff;
+      cursor: pointer;
+    }
+
     .price {
       font-size: 1rem;
       font-weight: 600;

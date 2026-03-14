@@ -1,9 +1,10 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
-import { createOrder } from '@/services/api';
+import { createOrder, createConversation, fetchProduct } from '@/services/api';
 import styles from '@/styles/checkout.module.scss';
 
 export default function Checkout() {
@@ -24,6 +25,35 @@ export default function Checkout() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('card'); // 'card' | 'wallet' | 'cod'
+  const [messageSellerLoading, setMessageSellerLoading] = useState(null);
+  const [sellerMap, setSellerMap] = useState({}); // productId -> { seller_id, seller_name }
+
+  const uniqueSellers = [];
+  items.forEach((it) => {
+    const sid = it.product?.seller_id ?? sellerMap[it.product?.id]?.seller_id;
+    if (sid && !uniqueSellers.find((s) => s.id === sid)) {
+      uniqueSellers.push({
+        id: sid,
+        name: it.product?.seller?.name || sellerMap[it.product?.id]?.seller_name || 'Seller',
+        productId: it.product?.id,
+      });
+    }
+  });
+
+  useEffect(() => {
+    const toFetch = items.filter((i) => !i.product?.seller_id && i.product?.id);
+    if (toFetch.length === 0) return;
+    toFetch.forEach((it) => {
+      fetchProduct(it.product.id)
+        .then(({ data }) => {
+          setSellerMap((prev) => ({
+            ...prev,
+            [it.product.id]: { seller_id: data.seller_id, seller_name: data.seller?.name },
+          }));
+        })
+        .catch(() => {});
+    });
+  }, [items]);
 
   useEffect(() => {
     if (!user) {
@@ -70,6 +100,25 @@ ${form.city} ${form.postal_code}`.trim();
       );
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleMessageSeller = async (sellerId, productId) => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    setMessageSellerLoading(sellerId);
+    try {
+      const { data } = await createConversation({
+        other_user_id: sellerId,
+        product_id: productId || undefined,
+      });
+      router.push(`/messages?conversation=${data.conversation.id}`);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setMessageSellerLoading(null);
     }
   };
 
@@ -285,6 +334,22 @@ ${form.city} ${form.postal_code}`.trim();
               </div>
             ))}
           </div>
+          {uniqueSellers.length > 0 && (
+          <div className={styles.messageSellerSection}>
+            <p className={styles.messageSellerLabel}>Questions about your order?</p>
+            {uniqueSellers.map((s) => (
+              <button
+                key={s.id}
+                type="button"
+                onClick={() => handleMessageSeller(s.id, s.productId)}
+                disabled={messageSellerLoading === s.id}
+                className={styles.messageSellerBtn}
+              >
+                {messageSellerLoading === s.id ? 'Opening…' : `💬 Message ${s.name}`}
+              </button>
+            ))}
+          </div>
+        )}
           <div className={styles.summaryRow}>
             <span>Subtotal</span>
             <span>₱{subtotal.toFixed(2)}</span>

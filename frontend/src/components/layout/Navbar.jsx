@@ -84,15 +84,18 @@ export default function Navbar() {
           )}
         </div>
         <div className="nav-actions">
-          <Link href="/cart" aria-label="Cart" className="nav-cart">
-            <span className="nav-cart-icon">🛒</span>
-            {cartCount > 0 && <span className="nav-cart-count">{cartCount}</span>}
-          </Link>
+          {/* Cart should appear only for customers */}
+          {user?.role?.name === 'customer' && (
+            <Link href="/cart" aria-label="Cart" className="nav-cart">
+              <span className="nav-cart-icon">🛒</span>
+              {cartCount > 0 && <span className="nav-cart-count">{cartCount}</span>}
+            </Link>
+          )}
           {user ? (
             <>
               <Link href={getDashboardPath()} className="icon" aria-label="Account">👤</Link>
-              <Link href="/messages" className="nav-messages">
-                Messages
+              <Link href="/messages" className="nav-messages" aria-label="Messages">
+                💬
               </Link>
             </>
           ) : (

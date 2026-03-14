@@ -6,7 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useProtectedRoute } from '@/hooks/useProtectedRoute';
 import { useWishlist } from '@/context/WishlistContext';
 import { useCart } from '@/context/CartContext';
-import { fetchCustomerOrders, fetchProducts } from '@/services/api';
+import { fetchCustomerOrders, fetchProducts, updateOrderStatus } from '@/services/api';
 import { productImageUrl } from '@/utils/image';
 import styles from '@/styles/dashboard.module.scss';
 
@@ -40,7 +40,8 @@ export default function CustomerDashboard() {
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [orderFilter, setOrderFilter] = useState('all'); // all | to-ship | to-receive | completed | cancelled
+  const [orderFilter, setOrderFilter] = useState('all');
+  const [selectedSize, setSelectedSize] = useState({});
 
   useEffect(() => {
     if (user && user.role?.name === 'customer') {
@@ -81,7 +82,7 @@ export default function CustomerDashboard() {
             (data || []).map((p) => ({
               ...p,
               image: productImageUrl(p.image) || 'https://placehold.co/400x500?text=' + encodeURIComponent(p.name || ''),
-              sizes: p.sizes || ['S', 'M', 'L', 'XL'],
+              sizes: Array.isArray(p.sizes) ? p.sizes : ['S', 'M', 'L', 'XL'],
             })),
           );
         } catch (e) {
@@ -108,22 +109,42 @@ export default function CustomerDashboard() {
 
   const totalSpent = orders.reduce((sum, o) => sum + parseFloat(o.total_amount || 0), 0);
 
+  const getOrderStatus = (order) => (order.status || '').toLowerCase();
+
+  const orderCounts = {
+    all: orders.length,
+    toShip: orders.filter((o) => ['pending', 'confirmed', 'processing'].includes(getOrderStatus(o))).length,
+    toReceive: orders.filter((o) => getOrderStatus(o) === 'shipped').length,
+    completed: orders.filter((o) => getOrderStatus(o) === 'delivered').length,
+    cancelled: orders.filter((o) => getOrderStatus(o) === 'cancelled').length,
+  };
+
   const filteredOrders = orders.filter((order) => {
+    const s = getOrderStatus(order);
     if (orderFilter === 'all') return true;
-    if (orderFilter === 'to-ship') {
-      return ['pending', 'confirmed', 'processing'].includes(order.status);
-    }
-    if (orderFilter === 'to-receive') {
-      return order.status === 'shipped';
-    }
-    if (orderFilter === 'completed') {
-      return order.status === 'delivered';
-    }
-    if (orderFilter === 'cancelled') {
-      return order.status === 'cancelled';
-    }
+    if (orderFilter === 'to-ship') return ['pending', 'confirmed', 'processing'].includes(s);
+    if (orderFilter === 'to-receive') return s === 'shipped';
+    if (orderFilter === 'completed') return s === 'delivered';
+    if (orderFilter === 'cancelled') return s === 'cancelled';
     return true;
   });
+
+  const [cancellingId, setCancellingId] = useState(null);
+  const handleCancelOrder = async (order) => {
+    const status = getOrderStatus(order);
+    if (!['pending', 'confirmed', 'processing'].includes(status)) return;
+    if (!confirm('Cancel this order? This cannot be undone.')) return;
+    setCancellingId(order.id);
+    try {
+      await updateOrderStatus(order.id, 'cancelled');
+      await fetchOrders();
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Failed to cancel order.');
+    } finally {
+      setCancellingId(null);
+    }
+  };
 
   let filteredProducts = products;
   if (filterCategory) {
@@ -145,11 +166,19 @@ export default function CustomerDashboard() {
     filteredProducts = [...filteredProducts].sort((a, b) => (b.id || 0) - (a.id || 0));
   }
 
+  const handleSizeChange = (productId, size) => {
+    setSelectedSize((prev) => ({ ...prev, [productId]: size }));
+  };
+
   const handleAddToCart = (e, product) => {
     e.preventDefault();
-    const size = product.sizes?.[0] || 'M';
+    const size = selectedSize[product.id];
+    if (!size) {
+      alert('Please select a size first.');
+      return;
+    }
     addItem(product, { size, quantity: 1 });
-    alert(`Added ${product.name} to cart.`);
+    alert(`Added ${product.name} (Size: ${size}) to cart.`);
   };
 
   const handleLogout = async () => {
@@ -246,18 +275,16 @@ export default function CustomerDashboard() {
                 </div>
                 <div className={styles.filterSectionPro}>
                   <div className={styles.sectionTitle}>Size</div>
-                  <div className={styles.sizeOptions}>
+                  <select
+                    value={filterSize}
+                    onChange={(e) => setFilterSize(e.target.value)}
+                    className={styles.sizeDropdown}
+                  >
+                    <option value="">All</option>
                     {SIZES.map((s) => (
-                      <button
-                        key={s}
-                        type="button"
-                        className={`${styles.sizeBtn} ${filterSize === s ? styles.active : ''}`}
-                        onClick={() => setFilterSize(filterSize === s ? '' : s)}
-                      >
-                        {s}
-                      </button>
+                      <option key={s} value={s}>{s}</option>
                     ))}
-                  </div>
+                  </select>
                 </div>
                 <div className={styles.filterSectionPro}>
                   <div className={styles.sectionTitle}>Color</div>
@@ -335,6 +362,17 @@ export default function CustomerDashboard() {
                         <div className={styles.cardBody}>
                           <Link href={`/product/${product.id}`}><h3 className={styles.cardTitle}>{product.name}</h3></Link>
                           <p className={styles.cardCategory}>{product.category}</p>
+                          <label className={styles.sizeLabel}>Size</label>
+                          <select
+                            className={styles.sizeSelect}
+                            value={selectedSize[product.id] || ''}
+                            onChange={(e) => handleSizeChange(product.id, e.target.value)}
+                          >
+                            <option value="">Select Size</option>
+                            {(Array.isArray(product.sizes) ? product.sizes : ['S', 'M', 'L', 'XL']).map((s) => (
+                              <option key={s} value={s}>{s}</option>
+                            ))}
+                          </select>
                           <div className={styles.priceRow}>
                             <span className={styles.price}>₱{Number(product.price).toFixed(2)}</span>
                             {idx % 3 === 1 && <span className={styles.oldPrice}>₱{(Number(product.price) * 1.25).toFixed(2)}</span>}
@@ -357,7 +395,7 @@ export default function CustomerDashboard() {
               <div className={styles.mainContent}>
                 {ordersLoading ? (
                   <p>Loading orders...</p>
-                ) : filteredOrders.length > 0 ? (
+                ) : (
                   <>
                     <div className={styles.orderFilters}>
                       <button
@@ -365,53 +403,99 @@ export default function CustomerDashboard() {
                         className={`${styles.orderFilterBtn} ${orderFilter === 'all' ? styles.active : ''}`}
                         onClick={() => setOrderFilter('all')}
                       >
-                        All
+                        <span className={styles.orderFilterLabel}>All</span>
+                        <span className={styles.orderFilterCount}>{orderCounts.all}</span>
                       </button>
                       <button
                         type="button"
                         className={`${styles.orderFilterBtn} ${orderFilter === 'to-ship' ? styles.active : ''}`}
                         onClick={() => setOrderFilter('to-ship')}
                       >
-                        To Ship
+                        <span className={styles.orderFilterLabel}>To Ship</span>
+                        <span className={styles.orderFilterCount}>{orderCounts.toShip}</span>
                       </button>
                       <button
                         type="button"
                         className={`${styles.orderFilterBtn} ${orderFilter === 'to-receive' ? styles.active : ''}`}
                         onClick={() => setOrderFilter('to-receive')}
                       >
-                        To Receive
+                        <span className={styles.orderFilterLabel}>To Receive</span>
+                        <span className={styles.orderFilterCount}>{orderCounts.toReceive}</span>
                       </button>
                       <button
                         type="button"
                         className={`${styles.orderFilterBtn} ${orderFilter === 'completed' ? styles.active : ''}`}
                         onClick={() => setOrderFilter('completed')}
                       >
-                        Completed
+                        <span className={styles.orderFilterLabel}>Completed</span>
+                        <span className={styles.orderFilterCount}>{orderCounts.completed}</span>
                       </button>
                       <button
                         type="button"
                         className={`${styles.orderFilterBtn} ${orderFilter === 'cancelled' ? styles.active : ''}`}
                         onClick={() => setOrderFilter('cancelled')}
                       >
-                        Cancelled
+                        <span className={styles.orderFilterLabel}>Cancelled</span>
+                        <span className={styles.orderFilterCount}>{orderCounts.cancelled}</span>
                       </button>
                     </div>
-                    <div className={styles.ordersList}>
-                    {filteredOrders.map((order) => (
-                      <div key={order.id} className={styles.orderCard}>
-                        <div className={styles.orderHeader}>
-                          <h3>Order #{order.order_number}</h3>
-                          <span className={`${styles.status} ${styles[order.status]}`}>{order.status}</span>
-                        </div>
-                        <p>Date: {new Date(order.created_at).toLocaleDateString()}</p>
-                        <p>Total: ₱{parseFloat(order.total_amount).toFixed(2)}</p>
-                        <p>Payment Status: {order.payment_status}</p>
+                    {orders.length === 0 ? (
+                      <p className={styles.emptyState}>
+                        No orders yet. <Link href="/products">Start shopping!</Link>
+                      </p>
+                    ) : filteredOrders.length === 0 ? (
+                      <p className={styles.emptyState}>
+                        No orders in this status. Try a different filter.
+                      </p>
+                    ) : (
+                      <div className={styles.ordersList}>
+                        {filteredOrders.map((order) => {
+                          const status = getOrderStatus(order);
+                          const canCancel = ['pending', 'confirmed', 'processing'].includes(status);
+                          const canMarkDelivered = status === 'shipped';
+                          return (
+                            <div key={order.id} className={styles.orderCard}>
+                              <div className={styles.orderHeader}>
+                                <h3>Order #{order.order_number}</h3>
+                                <span className={`${styles.status} ${styles[status]}`}>{order.status}</span>
+                              </div>
+                              <p>Date: {new Date(order.created_at).toLocaleDateString()}</p>
+                              <p>Total: ₱{parseFloat(order.total_amount).toFixed(2)}</p>
+                              <p>Payment Status: {order.payment_status}</p>
+                              <div className={styles.orderActions}>
+                                {canCancel && (
+                                  <button
+                                    type="button"
+                                    className={styles.cancelOrderBtn}
+                                    onClick={() => handleCancelOrder(order)}
+                                    disabled={cancellingId === order.id}
+                                  >
+                                    {cancellingId === order.id ? 'Cancelling…' : 'Cancel order'}
+                                  </button>
+                                )}
+                                {canMarkDelivered && (
+                                  <button
+                                    type="button"
+                                    className={styles.primaryBtn}
+                                    onClick={async () => {
+                                      try {
+                                        await updateOrderStatus(order.id, 'delivered');
+                                        await fetchOrders();
+                                      } catch (e) {
+                                        alert(e.response?.data?.message || 'Failed to update.');
+                                      }
+                                    }}
+                                  >
+                                    I received it
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
                       </div>
-                    ))}
-                    </div>
+                    )}
                   </>
-                ) : (
-                  <p className={styles.emptyState}>No orders yet. <Link href="/products">Start shopping!</Link></p>
                 )}
               </div>
             )}

@@ -36,4 +36,23 @@ export const fetchCategories = () => api.get('/categories');
 export const createOrder = (payload) => api.post('/orders', payload);
 
 export const fetchCustomerOrders = () => api.get('/orders');
+export const updateOrderStatus = (orderId, status) =>
+  api.patch(`/orders/${orderId}/status`, { status });
+
+// Seller products
+export const fetchSellerProducts = () => api.get('/seller/products');
+export const createSellerProduct = (payload) => api.post('/seller/products', payload);
+export const updateSellerProduct = (id, payload) => api.put(`/seller/products/${id}`, payload);
+export const deleteSellerProduct = (id) => api.delete(`/seller/products/${id}`);
+export const fetchSellerOrders = () => api.get('/seller/orders');
+export const updateSellerOrderStatus = (orderId, status) =>
+  api.patch(`/seller/orders/${orderId}/status`, { status });
+
+// Messaging
+export const fetchConversationsUnreadCount = () => api.get('/conversations/unread-count');
+export const fetchConversations = () => api.get('/conversations');
+export const fetchConversation = (id) => api.get(`/conversations/${id}`);
+export const createConversation = (payload) => api.post('/conversations', payload);
+export const sendMessage = (conversationId, body) =>
+  api.post(`/conversations/${conversationId}/messages`, { body });
 

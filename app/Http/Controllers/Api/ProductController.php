@@ -39,7 +39,7 @@ class ProductController extends Controller
 
     public function show($id)
     {
-        $product = Product::with('category')->find($id);
+        $product = Product::with(['category', 'seller:id,name,email'])->find($id);
         if (!$product) {
             return response()->json(['message' => 'Product not found'], 404);
         }
@@ -55,6 +55,8 @@ class ProductController extends Controller
             'color' => $product->color,
             'stock' => $product->stock,
             'description' => $product->description,
+            'seller_id' => $product->seller_id,
+            'seller' => $product->seller ? ['id' => $product->seller->id, 'name' => $product->seller->name] : null,
         ]);
     }
 }

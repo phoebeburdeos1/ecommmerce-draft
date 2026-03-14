@@ -37,6 +37,7 @@ export default function Home() {
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
   const [trending, setTrending] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSize, setSelectedSize] = useState({});
 
   useEffect(() => {
     const load = async () => {
@@ -45,7 +46,7 @@ export default function Home() {
         const list = (data || []).slice(0, 4).map((p) => ({
           ...p,
           image: productImageUrl(p.image) || 'https://placehold.co/400x500?text=' + encodeURIComponent(p.name || ''),
-          sizes: p.sizes || ['S', 'M', 'L', 'XL'],
+          sizes: Array.isArray(p.sizes) ? p.sizes : ['S', 'M', 'L', 'XL'],
         }));
         setTrending(list);
       } catch (e) {
@@ -57,6 +58,10 @@ export default function Home() {
     load();
   }, []);
 
+  const handleSizeChange = (productId, size) => {
+    setSelectedSize((prev) => ({ ...prev, [productId]: size }));
+  };
+
   const handleAddToCart = (e, product) => {
     e.preventDefault();
     if (!user) {
@@ -64,9 +69,13 @@ export default function Home() {
       router.push('/auth/login');
       return;
     }
-    const size = product.sizes?.[0] || 'M';
+    const size = selectedSize[product.id];
+    if (!size) {
+      alert('Please select a size first.');
+      return;
+    }
     addItem(product, { size, quantity: 1 });
-    alert(`Added ${product.name} to cart.`);
+    alert(`Added ${product.name} (Size: ${size}) to cart.`);
   };
 
   return (
@@ -147,7 +156,19 @@ export default function Home() {
                   <h3 className={styles.productTitle}>
                     <Link href={`/product/${product.id}`}>{product.name}</Link>
                   </h3>
-                  <p className={styles.price}>${Number(product.price).toFixed(2)}</p>
+                  <p className={styles.category}>{product.category}</p>
+                  <label className={styles.sizeLabel}>Size</label>
+                  <select
+                    className={styles.sizeSelect}
+                    value={selectedSize[product.id] || ''}
+                    onChange={(e) => handleSizeChange(product.id, e.target.value)}
+                  >
+                    <option value="">Select Size</option>
+                    {(Array.isArray(product.sizes) ? product.sizes : ['S', 'M', 'L', 'XL']).map((s) => (
+                      <option key={s} value={s}>{s}</option>
+                    ))}
+                  </select>
+                  <p className={styles.price}>₱{Number(product.price).toFixed(2)}</p>
                   <button
                     type="button"
                     className={styles.addToCart}

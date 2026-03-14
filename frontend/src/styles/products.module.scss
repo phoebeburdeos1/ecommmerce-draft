@@ -285,11 +285,37 @@
             margin: 0 0 12px;
         }
 
+        .sizeLabel {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            color: #4a5568;
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .sizeSelect {
+            width: 100%;
+            padding: 10px 12px;
+            border-radius: 6px;
+            border: 1px solid #cbd5e0;
+            margin-bottom: 12px;
+            font-size: 13px;
+            background: #fff;
+            cursor: pointer;
+
+            &:focus {
+                outline: none;
+                border-color: var(--accent, #0b73ff);
+            }
+        }
+
         .priceRow {
             display: flex;
             align-items: center;
             gap: 10px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
 
             .price {
                 font-size: 16px;

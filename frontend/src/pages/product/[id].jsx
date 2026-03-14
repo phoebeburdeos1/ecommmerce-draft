@@ -5,7 +5,7 @@ import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
 import { useCart } from '@/context/CartContext';
 import { useWishlist } from '@/context/WishlistContext';
-import { fetchProduct } from '@/services/api';
+import { fetchProduct, createConversation } from '@/services/api';
 import { productImageUrl } from '@/utils/image';
 import styles from '@/styles/products.module.scss';
 
@@ -19,16 +19,18 @@ export default function ProductDetail() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [selectedSize, setSelectedSize] = useState('');
+  const [messageSellerLoading, setMessageSellerLoading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
     const load = async () => {
       try {
         const { data } = await fetchProduct(id);
+        const sizes = Array.isArray(data.sizes) ? data.sizes : ['S', 'M', 'L', 'XL'];
         setProduct({
           ...data,
           image: productImageUrl(data.image) || 'https://placehold.co/500x600?text=' + encodeURIComponent(data.name || 'Product'),
-          sizes: data.sizes || ['S', 'M', 'L', 'XL'],
+          sizes,
         });
       } catch (e) {
         if (e.response?.status === 404) setError('Product not found.');
@@ -53,6 +55,30 @@ export default function ProductDetail() {
     }
     addItem(product, { size: selectedSize, quantity: 1 });
     alert(`Added ${product.name} (Size: ${selectedSize}) to cart.`);
+  };
+
+  const handleMessageSeller = async () => {
+    if (!user) {
+      router.push('/auth/login');
+      return;
+    }
+    if (!product.seller_id) {
+      alert('Seller information is not available for this product.');
+      return;
+    }
+    setMessageSellerLoading(true);
+    try {
+      const { data } = await createConversation({
+        other_user_id: product.seller_id,
+        product_id: product.id,
+      });
+      router.push(`/messages?conversation=${data.conversation.id}`);
+    } catch (err) {
+      console.error(err);
+      alert(err.response?.data?.message || 'Could not start conversation.');
+    } finally {
+      setMessageSellerLoading(false);
+    }
   };
 
   if (loading) {
@@ -114,7 +140,7 @@ export default function ProductDetail() {
               style={{ width: '100%', padding: 12, borderRadius: 6, border: '1px solid #cbd5e0', marginBottom: 16, fontSize: 14 }}
             >
               <option value="">Select Size</option>
-              {product.sizes.map((s) => (
+              {(Array.isArray(product.sizes) ? product.sizes : ['S', 'M', 'L', 'XL']).map((s) => (
                 <option key={s} value={s}>{s}</option>
               ))}
             </select>
@@ -122,6 +148,26 @@ export default function ProductDetail() {
               Add to Cart
             </button>
           </form>
+          {product.seller_id && user?.role?.name === 'customer' && (
+            <button
+              type="button"
+              onClick={handleMessageSeller}
+              disabled={messageSellerLoading}
+              style={{
+                width: '100%',
+                marginTop: 12,
+                padding: 12,
+                background: '#f3f4f6',
+                border: '1px solid #d1d5db',
+                borderRadius: 6,
+                cursor: messageSellerLoading ? 'not-allowed' : 'pointer',
+                fontWeight: 600,
+                fontSize: 14,
+              }}
+            >
+              {messageSellerLoading ? 'Opening...' : '💬 Message seller'}
+            </button>
+          )}
           <Link href="/products" style={{ display: 'inline-block', marginTop: 16, color: '#0b73ff' }}>
             ← Back to products
           </Link>
