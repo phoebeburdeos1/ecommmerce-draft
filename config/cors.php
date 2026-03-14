@@ -22,9 +22,12 @@ return [
     'allowed_origins' => [
         'https://urbannext.vercel.app',
         'http://localhost:3000',
+        'http://127.0.0.1:3000',
     ],
 
-    'allowed_origins_patterns' => [],
+    'allowed_origins_patterns' => [
+        '#^https://[a-z0-9-]+(\.[a-z0-9-]+)*\.vercel\.app$#',
+    ],
 
     'allowed_headers' => ['*'],
 
