@@ -10,13 +10,14 @@ class AddCorsHeaders
     public function handle(Request $request, Closure $next)
     {
         $origin = $request->header('Origin');
+        if ($origin) {
+            $origin = rtrim($origin, '/');
+        }
+        // Allow Vercel, localhost, or any vercel.app subdomain
         $allowed = $origin && (
-            in_array($origin, [
-                'https://urbannext.vercel.app',
-                'http://localhost:3000',
-                'http://127.0.0.1:3000',
-            ], true)
-            || preg_match('#^https://[a-z0-9.-]+\.vercel\.app$#', $origin)
+            str_contains($origin, 'vercel.app')
+            || str_contains($origin, 'localhost')
+            || str_contains($origin, '127.0.0.1')
         );
 
         if ($request->is('api/*') || $request->is('sanctum/*')) {
@@ -31,6 +32,10 @@ class AddCorsHeaders
                 $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
                 $response->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
                 $response->header('Access-Control-Max-Age', '86400');
+            } else {
+                // If no Origin (e.g. same-origin or Postman), still allow API to respond
+                $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                $response->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
             }
             return $response;
         }
