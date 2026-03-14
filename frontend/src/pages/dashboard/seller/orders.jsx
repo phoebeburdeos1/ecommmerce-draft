@@ -76,35 +76,38 @@ export default function SellerOrders() {
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(239, 68, 68, 0.12)', color: '#dc2626' }}>📋</div>
           <p className={styles.statValue}>{pendingCount}</p>
           <p className={styles.statLabel}>Pending Orders</p>
-          <span className={styles.statMeta} style={{ color: '#dc2626' }}>Needs action</span>
+          <span className={styles.statMeta} style={{ color: '#dc2626', fontWeight: 600 }}>Needs action</span>
         </div>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}>📦</div>
           <p className={styles.statValue}>0</p>
           <p className={styles.statLabel}>Ready for Courier</p>
           <span className={styles.statMeta}>Awaiting pickup</span>
         </div>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#059669' }}>🚚</div>
           <p className={styles.statValue}>0</p>
           <p className={styles.statLabel}>Shipped Today</p>
           <span className={styles.statTrend}>+0% vs yesterday</span>
         </div>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#d97706' }}>₱</div>
           <p className={styles.statValue}>₱{totalRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
           <p className={styles.statLabel}>Total Revenue</p>
           <span className={styles.statMeta}>This week</span>
         </div>
       </div>
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div className={styles.tabRow}>
         {statusTabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setStatusFilter(tab.id)}
-            className={statusFilter === tab.id ? styles.primaryButton : styles.secondaryButton}
-            style={{ padding: '8px 16px', fontSize: 13 }}
+            className={`${styles.tabBtn} ${statusFilter === tab.id ? styles.tabBtnActive : ''}`}
           >
             {tab.label}
           </button>
@@ -116,7 +119,8 @@ export default function SellerOrders() {
         placeholder="Search orders..."
         value={search}
         onChange={(e) => setSearch(e.target.value)}
-        style={{ width: '100%', maxWidth: 320, padding: '10px 14px', marginBottom: 20, border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+        className={styles.searchInput}
+        style={{ maxWidth: 320, marginBottom: 20 }}
       />
 
       <div className={styles.card}>
@@ -124,7 +128,11 @@ export default function SellerOrders() {
           {loading ? (
             <p className={styles.emptyState}>Loading...</p>
           ) : filtered.length === 0 ? (
-            <p className={styles.emptyState}>No orders match your filters.</p>
+            <div className={styles.emptyState}>
+              <div className={styles.emptyStateIcon}>📋</div>
+              <p style={{ margin: 0 }}>No orders match your filters.</p>
+              <p style={{ margin: '8px 0 0', fontSize: 14, color: '#94a3b8' }}>Try a different status or search term.</p>
+            </div>
           ) : (
             <table className={styles.table}>
               <thead>

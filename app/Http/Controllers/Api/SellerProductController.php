@@ -45,7 +45,10 @@ class SellerProductController extends Controller
             'stock' => 'required|integer|min:0',
             'category_id' => 'required|exists:categories,id',
             'image' => 'nullable|string',
+            'sizes' => 'nullable|array',
+            'sizes.*' => 'string|max:20',
         ]);
+        $sizes = isset($validated['sizes']) ? array_values(array_filter(array_map('trim', $validated['sizes']))) : null;
 
         $product = Product::create([
             'name' => $validated['name'],
@@ -56,6 +59,7 @@ class SellerProductController extends Controller
             'image' => $validated['image'] ?? null,
             'category_id' => $validated['category_id'],
             'seller_id' => $request->user()->id,
+            'sizes' => $sizes,
         ]);
 
         return response()->json([
@@ -82,8 +86,12 @@ class SellerProductController extends Controller
             'category_id' => 'nullable|exists:categories,id',
             'image' => 'nullable|string',
             'is_active' => 'nullable|boolean',
+            'sizes' => 'nullable|array',
+            'sizes.*' => 'string|max:20',
         ]);
-
+        if (array_key_exists('sizes', $validated)) {
+            $validated['sizes'] = array_values(array_filter(array_map('trim', $validated['sizes'])));
+        }
         $product->update(array_filter($validated));
 
         return response()->json([

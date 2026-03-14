@@ -11,7 +11,7 @@ import {
 import { productImageUrl } from '@/utils/image';
 import styles from '@/styles/sellerPortal.module.scss';
 
-const emptyProduct = { name: '', description: '', price: '', stock: '', category_id: '', image: '' };
+const emptyProduct = { name: '', description: '', price: '', stock: '', category_id: '', image: '', sizes: '' };
 
 export default function SellerInventory() {
   const [products, setProducts] = useState([]);
@@ -78,6 +78,7 @@ export default function SellerInventory() {
       stock: String(p.stock),
       category_id: String(p.category_id || ''),
       image: p.image || '',
+      sizes: Array.isArray(p.sizes) && p.sizes.length ? p.sizes.join(', ') : (p.sizes || ''),
     });
     setError('');
     setShowModal(true);
@@ -88,6 +89,7 @@ export default function SellerInventory() {
     setError('');
     setSubmitLoading(true);
     try {
+      const sizesArr = form.sizes ? form.sizes.split(',').map((s) => s.trim()).filter(Boolean) : null;
       const payload = {
         name: form.name.trim(),
         description: form.description.trim() || null,
@@ -95,6 +97,7 @@ export default function SellerInventory() {
         stock: parseInt(form.stock, 10),
         category_id: parseInt(form.category_id, 10),
         image: form.image.trim() || null,
+        sizes: sizesArr && sizesArr.length ? sizesArr : null,
       };
       if (editingProduct) {
         await updateSellerProduct(editingProduct.id, payload);
@@ -156,15 +159,15 @@ export default function SellerInventory() {
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, flexWrap: 'wrap' }}>
         <input
           type="search"
-          placeholder="Search by product name or SKU..."
+          placeholder="Search by product name..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
-          style={{ flex: 1, minWidth: 200, padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+          className={styles.searchInput}
         />
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          style={{ padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+          className={styles.filterSelect}
         >
           <option value="all">Status: All</option>
           <option value="live">Live</option>
@@ -173,7 +176,7 @@ export default function SellerInventory() {
         <select
           value={filterCategory}
           onChange={(e) => setFilterCategory(e.target.value)}
-          style={{ padding: '10px 14px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14 }}
+          className={styles.filterSelect}
         >
           <option value="all">Category: All</option>
           {categories.map((c) => (
@@ -187,7 +190,11 @@ export default function SellerInventory() {
           {loading ? (
             <p className={styles.emptyState}>Loading...</p>
           ) : filteredProducts.length === 0 ? (
-            <p className={styles.emptyState}>No products match. Add your first product above.</p>
+            <div className={styles.emptyState}>
+              <div className={styles.emptyStateIcon}>📦</div>
+              <p style={{ margin: 0 }}>No products match.</p>
+              <p style={{ margin: '8px 0 0', fontSize: 14, color: '#94a3b8' }}>Try different filters or add your first product above.</p>
+            </div>
           ) : (
             <table className={styles.table}>
               <thead>
@@ -220,16 +227,10 @@ export default function SellerInventory() {
                       </td>
                       <td>₱{parseFloat(p.price).toFixed(2)}</td>
                       <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <button type="button" onClick={() => handleStockChange(p, -1)} style={{ width: 32, height: 32, border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 16 }}>−</button>
-                          <input
-                            type="number"
-                            min={0}
-                            value={p.stock ?? 0}
-                            readOnly
-                            style={{ width: 56, textAlign: 'center', padding: 6, border: '1px solid #d1d5db', borderRadius: 6, fontSize: 14 }}
-                          />
-                          <button type="button" onClick={() => handleStockChange(p, 1)} style={{ width: 32, height: 32, border: '1px solid #d1d5db', borderRadius: 6, background: '#fff', cursor: 'pointer', fontSize: 16 }}>+</button>
+                        <div className={styles.stockControl}>
+                          <button type="button" onClick={() => handleStockChange(p, -1)} aria-label="Decrease stock">−</button>
+                          <input type="number" min={0} value={p.stock ?? 0} readOnly />
+                          <button type="button" onClick={() => handleStockChange(p, 1)} aria-label="Increase stock">+</button>
                         </div>
                         {(p.stock ?? 0) <= 5 && (p.stock ?? 0) > 0 && <div style={{ fontSize: 12, color: '#d97706', marginTop: 4 }}>Low Stock</div>}
                         {(p.stock ?? 0) === 0 && <div style={{ fontSize: 12, color: '#dc2626', marginTop: 4 }}>Out of Stock</div>}
@@ -237,7 +238,7 @@ export default function SellerInventory() {
                       <td><span className={`${styles.badge} ${status.className}`}>{status.label}</span></td>
                       <td>
                         <button type="button" className={styles.secondaryButton} style={{ padding: '6px 12px', fontSize: 13 }} onClick={() => openEdit(p)}>Edit</button>
-                        <button type="button" onClick={() => handleDelete(p)} style={{ marginLeft: 8, padding: '6px 12px', fontSize: 13, background: '#fee2e2', color: '#991b1b', border: 'none', borderRadius: 6, cursor: 'pointer' }}>Delete</button>
+                        <button type="button" className={styles.dangerBtn} style={{ marginLeft: 8 }} onClick={() => handleDelete(p)}>Delete</button>
                       </td>
                     </tr>
                   );
@@ -249,33 +250,38 @@ export default function SellerInventory() {
       </div>
 
       {showModal && (
-        <div className={styles.modalOverlay} onClick={() => setShowModal(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }}>
-          <div className={styles.modal} onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 12, padding: 24, maxWidth: 480, width: '100%', maxHeight: '90vh', overflow: 'auto' }}>
-            <h2 style={{ margin: '0 0 20px', fontSize: 20 }}>{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
+        <div className={styles.modalOverlay} onClick={() => setShowModal(false)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <h2 className={styles.modalTitle}>{editingProduct ? 'Edit Product' : 'Add Product'}</h2>
             {error && <p style={{ color: '#dc2626', marginBottom: 12, fontSize: 14 }}>{error}</p>}
             <form onSubmit={handleSubmit}>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, fontSize: 14 }}>Name *</label>
-                <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8 }} />
+                <label className={styles.formLabel}>Name *</label>
+                <input required value={form.name} onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))} placeholder="Product name" className={styles.formInput} />
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, fontSize: 14 }}>Price (₱) *</label>
-                <input type="number" step="0.01" min={0} required value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8 }} />
+                <label className={styles.formLabel}>Price (₱) *</label>
+                <input type="number" step="0.01" min={0} required value={form.price} onChange={(e) => setForm((f) => ({ ...f, price: e.target.value }))} className={styles.formInput} />
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, fontSize: 14 }}>Stock *</label>
-                <input type="number" min={0} required value={form.stock} onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))} style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8 }} />
+                <label className={styles.formLabel}>Stock *</label>
+                <input type="number" min={0} required value={form.stock} onChange={(e) => setForm((f) => ({ ...f, stock: e.target.value }))} className={styles.formInput} />
               </div>
               <div style={{ marginBottom: 16 }}>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, fontSize: 14 }}>Category *</label>
-                <select required value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))} style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8 }}>
+                <label className={styles.formLabel}>Category *</label>
+                <select required value={form.category_id} onChange={(e) => setForm((f) => ({ ...f, category_id: e.target.value }))} className={styles.formInput}>
                   <option value="">Select category</option>
                   {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
               </div>
+              <div style={{ marginBottom: 16 }}>
+                <label className={styles.formLabel}>Sizes</label>
+                <input value={form.sizes} onChange={(e) => setForm((f) => ({ ...f, sizes: e.target.value }))} placeholder="e.g. S, M, L, XL" className={styles.formInput} />
+                <span className={styles.formHint}>Comma-separated. Leave empty if no sizes.</span>
+              </div>
               <div style={{ marginBottom: 20 }}>
-                <label style={{ display: 'block', marginBottom: 6, fontWeight: 500, fontSize: 14 }}>Image URL</label>
-                <input value={form.image} onChange={(e) => setForm((f) => ({ ...f, image: e.target.value }))} placeholder="https://..." style={{ width: '100%', padding: 10, border: '1px solid #d1d5db', borderRadius: 8 }} />
+                <label className={styles.formLabel}>Image URL</label>
+                <input value={form.image} onChange={(e) => setForm((f) => ({ ...f, image: e.target.value }))} placeholder="https://..." className={styles.formInput} />
               </div>
               <div style={{ display: 'flex', gap: 12 }}>
                 <button type="submit" className={styles.primaryButton} disabled={submitLoading}>{submitLoading ? 'Saving...' : 'Save'}</button>

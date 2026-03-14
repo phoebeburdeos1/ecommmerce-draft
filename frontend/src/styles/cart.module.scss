@@ -7,7 +7,8 @@
         font-size: 28px;
         font-weight: 800;
         margin-bottom: 30px;
-        color: #111;
+        color: #0f172a;
+        letter-spacing: -0.02em;
     }
 }
 
@@ -89,31 +90,33 @@
     input {
         width: 60px;
         padding: 8px;
-        border: 1px solid #cbd5e0;
-        border-radius: 6px;
+        border: 1px solid #e2e8f0;
+        border-radius: 8px;
         text-align: center;
         font-size: 14px;
         outline: none;
 
         &:focus {
-            border-color: var(--accent, #0b73ff);
+            border-color: #6366f1;
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.12);
         }
     }
 
     button {
-        background: #f1f5f9;
+        background: #f8fafc;
         color: #475569;
-        border: none;
+        border: 1px solid #e2e8f0;
         padding: 8px 12px;
-        border-radius: 6px;
+        border-radius: 8px;
         cursor: pointer;
         font-weight: 600;
         font-size: 13px;
         transition: all 0.2s;
 
         &:hover {
-            background: #e2e8f0;
-            color: #0f172a;
+            background: #eef2ff;
+            border-color: #6366f1;
+            color: #6366f1;
         }
     }
 }
@@ -142,8 +145,9 @@
     .summaryBox {
         background: white;
         padding: 32px;
-        border-radius: 12px;
+        border-radius: 16px;
         box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+        border: 1px solid #e2e8f0;
         width: 100%;
         max-width: 400px;
 
@@ -176,18 +180,20 @@
 
         .checkoutBtn {
             width: 100%;
-            background: var(--accent, #0b73ff);
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
             color: white;
             border: none;
             padding: 16px;
-            border-radius: 8px;
+            border-radius: 10px;
             cursor: pointer;
             font-weight: 700;
             font-size: 16px;
-            transition: background 0.2s;
+            box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+            transition: box-shadow 0.2s, transform 0.15s;
 
             &:hover {
-                background: #095edb;
+                box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+                transform: translateY(-1px);
             }
         }
 
@@ -195,12 +201,13 @@
             display: block;
             text-align: center;
             margin-top: 16px;
-            color: var(--accent, #0b73ff);
+            color: #6366f1;
             text-decoration: none;
             font-weight: 600;
             font-size: 14px;
 
             &:hover {
+                color: #4f46e5;
                 text-decoration: underline;
             }
         }
@@ -210,13 +217,15 @@
 .emptyCart {
     text-align: center;
     padding: 80px 20px;
-    background: white;
-    border-radius: 12px;
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    border-radius: 16px;
+    border: 1px dashed #e2e8f0;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.02);
 
     .emptyIcon {
-        font-size: 48px;
-        margin-bottom: 16px;
+        font-size: 56px;
+        margin-bottom: 20px;
+        opacity: 0.85;
     }
 
     p {
@@ -226,17 +235,19 @@
     }
 
     a {
-        background: var(--accent, #0b73ff);
+        background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
         color: white;
         padding: 14px 28px;
-        border-radius: 8px;
+        border-radius: 10px;
         text-decoration: none;
         font-weight: 600;
         display: inline-block;
-        transition: background 0.2s;
+        box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+        transition: box-shadow 0.2s, transform 0.15s;
 
         &:hover {
-            background: #095edb;
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+            transform: translateY(-2px);
         }
     }
 }

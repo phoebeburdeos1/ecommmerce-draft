@@ -4,14 +4,14 @@
   align-items: center;
   min-height: calc(100vh - 80px);
   padding: 40px 20px;
-  background: #eef2f7;
+  background: linear-gradient(160deg, #f8fafc 0%, #eef2ff 50%, #f1f5f9 100%);
 }
 
 .authCard {
   background: #fff;
-  border-radius: 16px;
+  border-radius: 20px;
   padding: 40px;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06), 0 0 0 1px rgba(99, 102, 241, 0.06);
   width: 100%;
   max-width: 420px;
 }
@@ -23,30 +23,32 @@
 }
 
 .authIcon {
-  width: 56px;
-  height: 56px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
-  background: #eff6ff;
-  color: #2563eb;
-  font-size: 24px;
+  background: linear-gradient(135deg, #eef2ff 0%, #e0e7ff 100%);
+  color: #6366f1;
+  font-size: 26px;
   display: flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.15);
 }
 
 .authTitle {
   text-align: center;
   margin: 0 0 8px;
-  color: #111827;
-  font-size: 24px;
-  font-weight: 700;
+  color: #0f172a;
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .authSubtitle {
   text-align: center;
   margin: 0 0 24px;
-  color: #6b7280;
+  color: #64748b;
   font-size: 14px;
 }
 
@@ -98,14 +100,14 @@
   position: relative;
   display: flex;
   align-items: center;
-  border: 1px solid #e5e7eb;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fff;
   transition: border-color 0.2s, box-shadow 0.2s;
 
   &:focus-within {
-    border-color: #2563eb;
-    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+    border-color: #6366f1;
+    box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12);
   }
 }
 
@@ -158,21 +160,22 @@
   align-items: center;
   gap: 8px;
   font-size: 14px;
-  color: #374151;
+  color: #475569;
   cursor: pointer;
   input {
     width: 16px;
     height: 16px;
-    accent-color: #2563eb;
+    accent-color: #6366f1;
   }
 }
 
 .forgotLink {
   font-size: 14px;
-  color: #2563eb;
+  color: #6366f1;
   text-decoration: none;
-  font-weight: 500;
+  font-weight: 600;
   &:hover {
+    color: #4f46e5;
     text-decoration: underline;
   }
 }
@@ -180,21 +183,24 @@
 .submitBtn {
   width: 100%;
   padding: 14px;
-  background: #2563eb;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: #fff;
   border: none;
   border-radius: 10px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.2s;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  transition: box-shadow 0.2s, transform 0.15s;
 
   &:hover:not(:disabled) {
-    background: #1d4ed8;
+    box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+    transform: translateY(-1px);
   }
   &:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+    transform: none;
   }
 }
 
@@ -263,12 +269,13 @@
   text-align: center;
   margin-top: 24px;
   font-size: 14px;
-  color: #6b7280;
+  color: #64748b;
   a {
-    color: #2563eb;
+    color: #6366f1;
     text-decoration: none;
     font-weight: 600;
     &:hover {
+      color: #4f46e5;
       text-decoration: underline;
     }
   }

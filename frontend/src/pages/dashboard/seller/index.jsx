@@ -62,16 +62,19 @@ export default function SellerDashboardHome() {
 
       <div className={styles.statsGrid}>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#059669' }}>₱</div>
           <p className={styles.statValue}>₱{totalEarnings.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</p>
           <p className={styles.statLabel}>Total Earnings</p>
           <span className={styles.statTrend}>+0% vs last month</span>
         </div>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#6366f1' }}>📦</div>
           <p className={styles.statValue}>{orders.reduce((acc, o) => acc + (o.items || []).reduce((a, i) => a + (i.quantity || 1), 0), 0)}</p>
           <p className={styles.statLabel}>Items Sold</p>
           <span className={styles.statMeta}>Orders this month</span>
         </div>
         <div className={styles.statCard}>
+          <div className={styles.statIcon} style={{ background: 'rgba(245, 158, 11, 0.15)', color: '#d97706' }}>★</div>
           <p className={styles.statValue}>4.9 ★★★★☆</p>
           <p className={styles.statLabel}>Store Rating</p>
           <span className={styles.statMeta}>Reviews</span>
@@ -90,7 +93,11 @@ export default function SellerDashboardHome() {
             {loading ? (
               <p className={styles.emptyState}>Loading...</p>
             ) : recentOrders.length === 0 ? (
-              <p className={styles.emptyState}>No orders yet.</p>
+              <div className={styles.emptyState}>
+                <div className={styles.emptyStateIcon}>🛒</div>
+                <p style={{ margin: 0 }}>No orders yet.</p>
+                <p style={{ margin: '8px 0 0', fontSize: 14, color: '#94a3b8' }}>Orders will show up here when customers buy.</p>
+              </div>
             ) : (
               <table className={styles.table}>
                 <thead>
@@ -133,7 +140,11 @@ export default function SellerDashboardHome() {
             {loading ? (
               <p className={styles.emptyState}>Loading...</p>
             ) : lowStockProducts.length === 0 && outOfStock.length === 0 ? (
-              <p className={styles.emptyState}>All products are well stocked.</p>
+              <div className={styles.emptyState}>
+                <div className={styles.emptyStateIcon}>✨</div>
+                <p style={{ margin: 0 }}>All products are well stocked.</p>
+                <p style={{ margin: '8px 0 0', fontSize: 14, color: '#94a3b8' }}>No low stock or out-of-stock items.</p>
+              </div>
             ) : (
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
                 {[...outOfStock, ...lowStockProducts].slice(0, 5).map((p) => (

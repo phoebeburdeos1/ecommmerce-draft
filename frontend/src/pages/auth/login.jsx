@@ -41,7 +41,12 @@ export default function Login() {
       else if (userRole === 'seller') router.push('/dashboard/seller');
       else if (userRole === 'admin') router.push('/dashboard/admin');
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      const msg =
+        err.response?.data?.message ||
+        err.response?.data?.errors?.email?.[0] ||
+        (err.request && !err.response ? 'Cannot reach the server. Is the API running at ' + (process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000') + '?' : null) ||
+        'Login failed. Please try again.';
+      setError(msg);
     } finally {
       setLoading(false);
     }
