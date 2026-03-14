@@ -27,6 +27,9 @@ WORKDIR /app
 # Copy app (respects .dockerignore / .railwayignore)
 COPY . .
 
+# server.php must be in project root for PHP built-in server / Railway. We keep it in routes/ in the repo (to avoid permission issues on some systems) and copy it to root at build time.
+COPY routes/server.php /app/server.php
+
 # Install PHP deps (no dev for production)
 RUN composer install --no-dev --optimize-autoloader --no-interaction
 
