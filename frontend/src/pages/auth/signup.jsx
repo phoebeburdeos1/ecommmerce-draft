@@ -49,7 +49,17 @@ export default function Signup() {
       );
       router.push('/dashboard/customer');
     } catch (err) {
-      setError(err.response?.data?.message || err.response?.data?.errors?.email?.[0] || 'Signup failed. Please try again.');
+      const status = err.response?.status;
+      const data = err.response?.data;
+      if (status === 429) {
+        setError('Too many attempts. Please wait a minute and try again.');
+      } else if (data?.errors?.email) {
+        setError(data.errors.email[0]);
+      } else if (data?.message) {
+        setError(data.message);
+      } else {
+        setError('Signup failed. Please try again.');
+      }
     } finally {
       setLoading(false);
     }
@@ -141,7 +151,7 @@ export default function Signup() {
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
-                {showPassword ? '🙈' : '👁'}
+                {showPassword ? '🔒' : '👁'}
               </button>
             </div>
           </div>

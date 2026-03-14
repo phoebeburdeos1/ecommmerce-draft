@@ -96,7 +96,7 @@ export default function Login() {
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
                 tabIndex={-1}
               >
-                {showPassword ? '🙈' : '👁'}
+                {showPassword ? '🔒' : '👁'}
               </button>
             </div>
           </div>
