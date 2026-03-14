@@ -1,0 +1,10 @@
+# Don't copy frontend into the Laravel image
+frontend/
+.git
+.gitignore
+.env
+.env.*
+!.env.example
+node_modules
+*.md
+.DS_Store
