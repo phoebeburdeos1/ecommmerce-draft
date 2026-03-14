@@ -1,0 +1,2 @@
+# Ignore frontend when building Laravel on Railway (faster builds)
+frontend/
