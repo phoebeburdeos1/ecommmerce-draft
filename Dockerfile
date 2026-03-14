@@ -33,5 +33,5 @@ RUN composer install --no-dev --optimize-autoloader --no-interaction
 # Railway sets PORT at runtime
 EXPOSE 8000
 
-# Serve Laravel (public is document root via artisan serve)
-CMD sh -c 'php artisan serve --host=0.0.0.0 --port=${PORT:-8000}'
+# Run migrations then serve (migrations use Railway's DB_* env vars)
+CMD sh -c 'php artisan migrate --force && php artisan serve --host=0.0.0.0 --port=${PORT:-8000}'
