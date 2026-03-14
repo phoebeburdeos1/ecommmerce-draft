@@ -3,6 +3,7 @@
 namespace App\Exceptions;
 
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+use Illuminate\Http\Request;
 use Throwable;
 
 class Handler extends ExceptionHandler
@@ -37,5 +38,33 @@ class Handler extends ExceptionHandler
         $this->reportable(function (Throwable $e) {
             //
         });
+    }
+
+    /**
+     * Add CORS headers to API error responses so browser doesn't block with "No CORS header"
+     */
+    protected function shouldReturnJson($request, Throwable $e)
+    {
+        return $request->expectsJson() || $request->is('api/*');
+    }
+
+    public function render($request, Throwable $e)
+    {
+        $response = parent::render($request, $e);
+        if ($request->is('api/*') && method_exists($response, 'header')) {
+            $origin = $request->header('Origin');
+            $allowed = in_array($origin, [
+                'https://urbannext.vercel.app',
+                'http://localhost:3000',
+                'http://127.0.0.1:3000',
+            ], true) || ($origin && preg_match('#^https://[a-z0-9.-]+\.vercel\.app$#', $origin));
+            if ($allowed && $origin) {
+                $response->header('Access-Control-Allow-Origin', $origin);
+                $response->header('Access-Control-Allow-Credentials', 'true');
+                $response->header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+                $response->header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept');
+            }
+        }
+        return $response;
     }
 }
