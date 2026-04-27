@@ -30,6 +30,23 @@ class AdminController extends Controller
     }
 
     /**
+     * Canonical storefront user for UrbanNxt catalog products (Urban Store).
+     */
+    private function urbanStoreSellerId(Request $request): int
+    {
+        $email = config('commerce.store_seller_email');
+        $id = User::where('email', $email)->value('id');
+        if (!$id) {
+            $id = User::where('name', 'Urban Store')->orderBy('id')->value('id');
+        }
+        if (!$id) {
+            return (int) $request->user()->id;
+        }
+
+        return (int) $id;
+    }
+
+    /**
      * Get dashboard statistics
      */
     public function stats(Request $request)
@@ -285,6 +302,7 @@ class AdminController extends Controller
             return [
                 'id' => $p->id,
                 'name' => $p->name,
+                'image' => $p->image,
                 'category' => $p->category ? $p->category->name : null,
                 'stock' => (int) $p->stock,
                 'unit_price' => round((float) $p->price, 2),
@@ -395,8 +413,8 @@ class AdminController extends Controller
             'price' => 'required|numeric|min:0',
             'stock' => 'required|integer|min:0',
             'category_id' => 'required|exists:categories,id',
-            'image' => 'nullable|string',
-            'seller_id' => 'nullable|exists:users,id',
+            'image' => 'nullable|string|max:2048',
+            'image_file' => 'nullable|image|mimes:jpg,jpeg,png,webp|max:5120',
             'is_active' => 'nullable|boolean',
             'sizes' => 'nullable|array',
             'sizes.*' => 'string|max:20',
@@ -414,7 +432,19 @@ class AdminController extends Controller
             $capPeriod = null;
         }
 
-        $sellerId = $validated['seller_id'] ?? $request->user()->id;
+        $imagePath = $validated['image'] ?? null;
+        if ($request->hasFile('image_file')) {
+            $uploadDir = public_path('images/products');
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            $file = $request->file('image_file');
+            $filename = 'product_' . now()->format('Ymd_His') . '_' . Str::random(10) . '.' . $file->getClientOriginalExtension();
+            $file->move($uploadDir, $filename);
+            $imagePath = 'images/products/' . $filename;
+        }
+
+        $sellerId = $this->urbanStoreSellerId($request);
 
         $product = Product::create([
             'name' => $validated['name'],
@@ -422,7 +452,7 @@ class AdminController extends Controller
             'description' => $validated['description'] ?? null,
             'price' => $validated['price'],
             'stock' => $validated['stock'],
-            'image' => $validated['image'] ?? null,
+            'image' => $imagePath,
             'category_id' => $validated['category_id'],
             'seller_id' => $sellerId,
             'is_active' => $validated['is_active'] ?? true,
@@ -501,7 +531,6 @@ class AdminController extends Controller
             'stock' => 'nullable|integer|min:0',
             'category_id' => 'nullable|exists:categories,id',
             'image' => 'nullable|string',
-            'seller_id' => 'nullable|exists:users,id',
             'is_active' => 'nullable|boolean',
             'sizes' => 'nullable|array',
             'sizes.*' => 'string|max:20',
@@ -519,6 +548,8 @@ class AdminController extends Controller
         if (array_key_exists('sales_cap_quantity', $validated) && !$validated['sales_cap_quantity']) {
             $validated['sales_cap_period'] = null;
         }
+
+        $validated['seller_id'] = $this->urbanStoreSellerId($request);
 
         $product->update(array_filter($validated, fn ($v) => $v !== null));
 

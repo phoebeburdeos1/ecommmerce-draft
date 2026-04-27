@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useAuth } from '@/context/AuthContext';
@@ -48,13 +48,19 @@ import {
   AlertCircle,
   Archive,
   BadgeCheck,
+  Bell,
   Bike,
+  Coins,
+  Filter,
+  ImagePlus,
   MapPin,
   PackageSearch,
+  Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
   Search,
+  ShoppingCart,
   TrendingUp,
   Truck,
   Users,
@@ -62,6 +68,30 @@ import {
 } from 'lucide-react';
 import styles from '@/styles/dashboard.module.scss';
 import { PRODUCT_SIZE_OPTIONS } from '@/constants/commerce';
+
+const INV_PAGE_SIZE = 10;
+const PRODUCTS_PAGE_SIZE = 10;
+
+const PRODUCT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const PRODUCT_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp';
+
+function validateProductImageFile(file) {
+  if (!file) return 'No file selected.';
+  const okTypes = ['image/jpeg', 'image/png', 'image/webp'];
+  if (!okTypes.includes(file.type)) {
+    return 'Please use JPG, PNG, or WebP only.';
+  }
+  if (file.size > PRODUCT_IMAGE_MAX_BYTES) {
+    return 'Image must be 5MB or smaller.';
+  }
+  return null;
+}
+
+function formatInventorySku(id) {
+  const n = Number(id);
+  if (!Number.isFinite(n) || n <= 0) return 'SKU-0000';
+  return `SKU-${String(n).padStart(4, '0')}`;
+}
 
 function formatAdminSizesSummary(selected) {
   if (!selected || selected.length === 0) return 'Select sizes…';
@@ -149,11 +179,15 @@ export default function AdminDashboard() {
   const [productsSearch, setProductsSearch] = useState('');
   /** @type {'all' | 'pending' | 'live' | 'rejected'} */
   const [productsScopeTab, setProductsScopeTab] = useState('all');
+  const [productsTablePage, setProductsTablePage] = useState(1);
   const [productApprovalLoadingId, setProductApprovalLoadingId] = useState(null);
   const [inventoryRows, setInventoryRows] = useState([]);
   const [inventoryTotals, setInventoryTotals] = useState({ total_units_sold: 0, total_sales_amount: 0 });
   const [inventoryLoading, setInventoryLoading] = useState(false);
   const [inventorySearch, setInventorySearch] = useState('');
+  /** @type {'all' | 'in' | 'low' | 'out'} */
+  const [inventoryStockFilter, setInventoryStockFilter] = useState('all');
+  const [inventoryTablePage, setInventoryTablePage] = useState(1);
   const [customersSearch, setCustomersSearch] = useState('');
   const [categoriesSearch, setCategoriesSearch] = useState('');
   const [overviewOrdersSearch, setOverviewOrdersSearch] = useState('');
@@ -172,6 +206,13 @@ export default function AdminDashboard() {
   const [categoryCreating, setCategoryCreating] = useState(false);
   const [addProductOpen, setAddProductOpen] = useState(false);
   const [productCreating, setProductCreating] = useState(false);
+  const [newProductImageFile, setNewProductImageFile] = useState(null);
+  const [newProductImagePreview, setNewProductImagePreview] = useState('');
+  /** @type {'url' | 'file'} */
+  const [productMediaTab, setProductMediaTab] = useState('url');
+  const [productMediaDragActive, setProductMediaDragActive] = useState(false);
+  const newProductFileInputRef = useRef(null);
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [newProduct, setNewProduct] = useState({
     name: '',
     description: '',
@@ -225,6 +266,12 @@ export default function AdminDashboard() {
     setActiveTab(tab);
     router.replace({ pathname: '/dashboard/admin', query: { tab } }, undefined, { shallow: true });
   };
+
+  useEffect(() => () => {
+    if (newProductImagePreview && newProductImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(newProductImagePreview);
+    }
+  }, [newProductImagePreview]);
 
   useEffect(() => {
     if (!user) return;
@@ -578,6 +625,71 @@ export default function AdminDashboard() {
     sales_cap_period: '',
   });
 
+  const resetNewProductImageDraft = () => {
+    if (newProductImagePreview && newProductImagePreview.startsWith('blob:')) {
+      URL.revokeObjectURL(newProductImagePreview);
+    }
+    setNewProductImagePreview('');
+    setNewProductImageFile(null);
+    setProductMediaTab('url');
+    setProductMediaDragActive(false);
+    if (newProductFileInputRef.current) {
+      newProductFileInputRef.current.value = '';
+    }
+  };
+
+  const commitProductImageFile = (file) => {
+    if (!file) return false;
+    const err = validateProductImageFile(file);
+    if (err) {
+      showToast({ message: err, type: 'error' });
+      if (newProductFileInputRef.current) {
+        newProductFileInputRef.current.value = '';
+      }
+      return false;
+    }
+    setNewProductImagePreview((prev) => {
+      if (prev && prev.startsWith('blob:')) {
+        URL.revokeObjectURL(prev);
+      }
+      return URL.createObjectURL(file);
+    });
+    setNewProductImageFile(file);
+    return true;
+  };
+
+  const switchProductMediaTab = (tab) => {
+    if (tab === productMediaTab) return;
+    if (tab === 'url') {
+      if (newProductImagePreview && newProductImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(newProductImagePreview);
+      }
+      setNewProductImageFile(null);
+      setNewProductImagePreview('');
+      if (newProductFileInputRef.current) {
+        newProductFileInputRef.current.value = '';
+      }
+    } else {
+      setNewProduct((p) => ({ ...p, image: '' }));
+    }
+    setProductMediaTab(tab);
+  };
+
+  const clearProductMediaSelection = () => {
+    if (productMediaTab === 'file') {
+      if (newProductImagePreview && newProductImagePreview.startsWith('blob:')) {
+        URL.revokeObjectURL(newProductImagePreview);
+      }
+      setNewProductImageFile(null);
+      setNewProductImagePreview('');
+      if (newProductFileInputRef.current) {
+        newProductFileInputRef.current.value = '';
+      }
+    } else {
+      setNewProduct((p) => ({ ...p, image: '' }));
+    }
+  };
+
   const handleCreateProduct = async (e) => {
     e.preventDefault();
     const name = newProduct.name.trim();
@@ -596,17 +708,29 @@ export default function AdminDashboard() {
       showToast({ message: 'Enter a valid stock quantity.', type: 'error' });
       return;
     }
-    const payload = {
-      name,
-      description: newProduct.description.trim() || undefined,
-      price,
-      stock,
-      category_id: categoryId,
-    };
-    const img = newProduct.image.trim();
-    if (img) payload.image = img;
+    let imageUrlField = '';
+    let imageFileField = null;
+    if (productMediaTab === 'file' && newProductImageFile) {
+      const fileErr = validateProductImageFile(newProductImageFile);
+      if (fileErr) {
+        showToast({ message: fileErr, type: 'error' });
+        return;
+      }
+      imageFileField = newProductImageFile;
+    } else if (productMediaTab === 'url') {
+      imageUrlField = newProduct.image.trim();
+    }
+
+    const payload = new FormData();
+    payload.append('name', name);
+    if (newProduct.description.trim()) payload.append('description', newProduct.description.trim());
+    payload.append('price', String(price));
+    payload.append('stock', String(stock));
+    payload.append('category_id', String(categoryId));
+    if (imageUrlField) payload.append('image', imageUrlField);
+    if (imageFileField) payload.append('image_file', imageFileField);
     if (Array.isArray(newProduct.sizes) && newProduct.sizes.length > 0) {
-      payload.sizes = newProduct.sizes;
+      newProduct.sizes.forEach((size) => payload.append('sizes[]', size));
     }
     const capQtyRaw = String(newProduct.sales_cap_quantity || '').trim();
     const capPeriod = newProduct.sales_cap_period;
@@ -620,14 +744,15 @@ export default function AdminDashboard() {
         showToast({ message: 'Choose this month or this year for the sales cap.', type: 'error' });
         return;
       }
-      payload.sales_cap_quantity = capQty;
-      payload.sales_cap_period = capPeriod;
+      payload.append('sales_cap_quantity', String(capQty));
+      payload.append('sales_cap_period', capPeriod);
     }
     setProductCreating(true);
     try {
       const res = await createAdminProduct(payload);
       setAddProductOpen(false);
       resetNewProductForm();
+      resetNewProductImageDraft();
       const refreshed = await fetchAdminProducts();
       setProducts(refreshed.data.products || []);
       showToast({
@@ -744,9 +869,6 @@ export default function AdminDashboard() {
     return Array.from(map.values());
   }, [orders]);
 
-  const sparkRevenue = revenueSeries.map((d) => ({ v: d.revenue }));
-  const sparkOrders = revenueSeries.map((d) => ({ v: d.orders }));
-
   const overviewFilteredOrders = useMemo(() => {
     const q = overviewOrdersSearch.trim().toLowerCase();
     if (!q) return orders || [];
@@ -829,6 +951,46 @@ export default function AdminDashboard() {
     return c;
   }, [orders]);
 
+  const pendingOrdersCount = activeOrderStatusCounts.pending || 0;
+  const todayLabel = useMemo(
+    () => new Date().toLocaleDateString('en-PH', {
+      weekday: 'long',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+    }),
+    [],
+  );
+
+  const overviewRecentOrders = useMemo(() => {
+    const toneClasses = [
+      styles.overviewAvatarBlue,
+      styles.overviewAvatarPurple,
+      styles.overviewAvatarGreen,
+    ];
+    return (overviewFilteredOrders || []).slice(0, 3).map((o, idx) => {
+      const customerName = o.customer?.name || 'Customer';
+      const initials = customerName
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() || '')
+        .join('') || 'NA';
+      const st = String(o.status || '').toLowerCase();
+      const isPaid = ['confirmed', 'processing', 'shipped', 'delivered'].includes(st);
+      return {
+        id: o.id,
+        customerName,
+        orderCode: `#${o.order_number || o.id}`,
+        amount: Number(o.total_amount || 0),
+        statusLabel: isPaid ? 'Paid' : 'Pending',
+        statusClass: isPaid ? styles.overviewStatusPaid : styles.overviewStatusPending,
+        avatarClass: toneClasses[idx % toneClasses.length],
+        initials,
+      };
+    });
+  }, [overviewFilteredOrders]);
+
   const customerUsers = useMemo(
     () => (users || []).filter((u) => u.role?.name === 'customer'),
     [users],
@@ -852,14 +1014,121 @@ export default function AdminDashboard() {
     ));
   }, [products, productsSearch, productsScopeTab]);
 
-  const filteredInventoryRows = useMemo(() => {
+  const productsKpiCounts = useMemo(() => {
+    const list = products || [];
+    const live = list.filter((p) => (p.approval_status || 'approved') === 'approved').length;
+    const pending = list.filter((p) => (p.approval_status || 'approved') === 'pending').length;
+    const rejected = list.filter((p) => (p.approval_status || '') === 'rejected').length;
+    return { total: list.length, live, pending, rejected };
+  }, [products]);
+
+  const productsPageCount = Math.max(1, Math.ceil(filteredProducts.length / PRODUCTS_PAGE_SIZE));
+
+  const productsPaginatedRows = useMemo(() => {
+    const start = (productsTablePage - 1) * PRODUCTS_PAGE_SIZE;
+    return filteredProducts.slice(start, start + PRODUCTS_PAGE_SIZE);
+  }, [filteredProducts, productsTablePage]);
+
+  useEffect(() => {
+    setProductsTablePage(1);
+  }, [productsSearch, productsScopeTab]);
+
+  useEffect(() => {
+    if (productsTablePage > productsPageCount) {
+      setProductsTablePage(productsPageCount);
+    }
+  }, [productsPageCount, productsTablePage]);
+
+  const inventoryDisplayRows = useMemo(() => {
+    let rows = [...(inventoryRows || [])];
+    if (inventoryStockFilter === 'out') {
+      rows = rows.filter((r) => (r.stock ?? 0) === 0);
+    } else if (inventoryStockFilter === 'low') {
+      rows = rows.filter((r) => {
+        const s = r.stock ?? 0;
+        return s >= 1 && s <= 9;
+      });
+    } else if (inventoryStockFilter === 'in') {
+      rows = rows.filter((r) => (r.stock ?? 0) >= 10);
+    }
     const q = inventorySearch.trim().toLowerCase();
-    if (!q) return inventoryRows || [];
-    return (inventoryRows || []).filter((row) => (
-      String(row.name || '').toLowerCase().includes(q)
-      || String(row.category || '').toLowerCase().includes(q)
-    ));
-  }, [inventoryRows, inventorySearch]);
+    if (!q) return rows;
+    return rows.filter((row) => {
+      const product = (products || []).find((p) => Number(p.id) === Number(row.id));
+      const sellerName = product?.seller?.name || '';
+      return (
+        String(row.name || '').toLowerCase().includes(q)
+        || String(row.category || '').toLowerCase().includes(q)
+        || String(sellerName).toLowerCase().includes(q)
+      );
+    });
+  }, [inventoryRows, inventorySearch, inventoryStockFilter, products]);
+
+  const inventoryKpiCounts = useMemo(() => {
+    const rows = inventoryRows || [];
+    let inStock = 0;
+    let low = 0;
+    let out = 0;
+    rows.forEach((r) => {
+      const s = r.stock ?? 0;
+      if (s === 0) out += 1;
+      else if (s >= 10) inStock += 1;
+      else low += 1;
+    });
+    return { total: rows.length, inStock, low, out };
+  }, [inventoryRows]);
+
+  const inventoryMaxStockBar = useMemo(() => {
+    const stocks = (inventoryRows || []).map((r) => Number(r.stock ?? 0));
+    const m = stocks.length ? Math.max(...stocks) : 0;
+    return Math.max(10, m);
+  }, [inventoryRows]);
+
+  const inventoryPageCount = Math.max(1, Math.ceil(inventoryDisplayRows.length / INV_PAGE_SIZE));
+
+  const inventoryPaginatedRows = useMemo(() => {
+    const start = (inventoryTablePage - 1) * INV_PAGE_SIZE;
+    return inventoryDisplayRows.slice(start, start + INV_PAGE_SIZE);
+  }, [inventoryDisplayRows, inventoryTablePage]);
+
+  useEffect(() => {
+    setInventoryTablePage(1);
+  }, [inventorySearch, inventoryStockFilter]);
+
+  useEffect(() => {
+    if (inventoryTablePage > inventoryPageCount) {
+      setInventoryTablePage(inventoryPageCount);
+    }
+  }, [inventoryPageCount, inventoryTablePage]);
+
+  const inventoryByProductId = useMemo(() => {
+    const map = new Map();
+    (inventoryRows || []).forEach((row) => {
+      map.set(Number(row.id), row);
+    });
+    return map;
+  }, [inventoryRows]);
+
+  const openProductDetails = (productLike = {}) => {
+    const productId = Number(productLike.id);
+    if (!productId) return;
+    const productFromList = (products || []).find((p) => Number(p.id) === productId) || null;
+    const inventory = inventoryByProductId.get(productId) || {};
+    const base = productFromList || productLike;
+    setSelectedProduct({
+      id: productId,
+      name: base?.name || 'Untitled product',
+      image: base?.image || '',
+      category: base?.category?.name || productLike?.category || '—',
+      price: Number(base?.price ?? inventory?.unit_price ?? 0),
+      stock: Number(base?.stock ?? inventory?.stock ?? 0),
+      units_sold: Number(inventory?.units_sold ?? 0),
+      sales_total: Number(inventory?.sales_total ?? 0),
+      seller_name: base?.seller?.name || '—',
+      approval_status: base?.approval_status || 'approved',
+      description: base?.description || '',
+    });
+  };
 
   const filteredCustomerUsers = useMemo(() => {
     const q = customersSearch.trim().toLowerCase();
@@ -961,39 +1230,104 @@ export default function AdminDashboard() {
     <>
       <Head>
         <title>Admin Dashboard - urbanNxt</title>
+        {activeTab === 'inventory' || activeTab === 'products' ? (
+          <link
+            href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap"
+            rel="stylesheet"
+          />
+        ) : null}
       </Head>
       <div className={`${styles.adminProShell} ${styles.adminPro}`}>
         <AdminShell activeTab={activeTab} onTabChange={setTab} onLogout={handleLogout}>
-          <div className={`${styles.pageHeading} ${activeTab === 'orders' ? styles.adminOrdersPageHeading : ''}`}>
-            <h1 className={activeTab === 'orders' ? styles.adminOrdersHeroTitle : undefined}>
-              {activeTab === 'overview'
-                ? 'Overview'
-                : activeTab === 'orders'
-                ? 'Orders'
+          <div
+            className={
+              activeTab === 'inventory'
+                ? styles.inventoryPageHeadingOuter
                 : activeTab === 'products'
-                ? 'Products'
-                : activeTab === 'inventory'
-                ? 'Inventory'
-                : activeTab === 'categories'
-                ? 'Categories'
-                : activeTab === 'customers'
-                ? 'Customers'
-                : activeTab === 'analytics'
-                ? 'Analytics'
-                : 'Settings'}
-            </h1>
-            <p className={styles.subtitle}>
-              {activeTab === 'overview' && "Welcome back, Admin. Here's what's happening today."}
-              {activeTab === 'orders' && 'View and manage all customer orders in one place.'}
-              {activeTab === 'products' && 'Add products (they stay pending until you publish), manage stock, and categories.'}
-              {activeTab === 'inventory' && 'Stock on hand, units sold, and revenue per product (non-cancelled orders).'}
-              {activeTab === 'categories' && 'Manage categories for your storefront.'}
-              {activeTab === 'customers' && 'See customer details, status, and value.'}
-              {activeTab === 'analytics' && 'Overview of your store performance.'}
-              {activeTab === 'settings' && settingsTab === 'archive' && 'Archive & recovery: restore archived products and customers when needed.'}
-              {activeTab === 'settings' && settingsTab === 'riders' && 'Manage built-in delivery riders: names, phone, and plate numbers.'}
-              {activeTab === 'settings' && settingsTab !== 'archive' && settingsTab !== 'riders' && 'Manage store preferences and system settings.'}
-            </p>
+                  ? styles.productsPageHeadingOuter
+                  : `${styles.pageHeading} ${activeTab === 'orders' ? styles.adminOrdersPageHeading : ''}`
+            }
+          >
+            {activeTab === 'overview' ? (
+              <div className={styles.overviewTopbar}>
+                <div>
+                  <h1 className={styles.overviewPageTitle}>Overview</h1>
+                  <p className={styles.overviewPageSubtext}>Welcome back, Admin - {todayLabel}</p>
+                </div>
+                <div className={styles.overviewTopbarActions}>
+                  <button
+                    type="button"
+                    className={styles.overviewBellBtn}
+                    onClick={() => {
+                      setTab('orders');
+                      setOrderSubTab('active');
+                      setActiveOrdersStatusFilter('pending');
+                    }}
+                    title={`Pending orders: ${pendingOrdersCount}`}
+                    aria-label={`Pending orders: ${pendingOrdersCount}`}
+                  >
+                    <Bell size={16} strokeWidth={1.8} aria-hidden />
+                    {pendingOrdersCount > 0 ? <span className={styles.overviewBellDot} aria-hidden /> : null}
+                  </button>
+                  <div className={styles.overviewAdminAvatar} aria-label="Admin profile">
+                    AD
+                  </div>
+                </div>
+              </div>
+            ) : activeTab === 'products' ? (
+              <header className={styles.productsPageHeading}>
+                <div>
+                  <h1 className={styles.productsPageTitle}>Products</h1>
+                  <p className={styles.productsPageSubtitle}>
+                    Add products (they stay pending until you publish), manage stock, and categories.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.productsAddProductBtn}
+                  onClick={() => {
+                    resetNewProductForm();
+                    resetNewProductImageDraft();
+                    setAddProductOpen(true);
+                  }}
+                >
+                  <Plus size={16} strokeWidth={2} aria-hidden />
+                  Add product
+                </button>
+              </header>
+            ) : activeTab === 'inventory' ? (
+              <header className={styles.inventoryPageHeading}>
+                <div>
+                  <h1 className={styles.inventoryPageTitle}>Inventory</h1>
+                  <p className={styles.inventoryPageSubtitle}>
+                    Track stock levels, manage reorder alerts, and update quantities.
+                  </p>
+                </div>
+              </header>
+            ) : (
+              <>
+                <h1 className={activeTab === 'orders' ? styles.adminOrdersHeroTitle : undefined}>
+                  {activeTab === 'orders'
+                    ? 'Orders'
+                    : activeTab === 'categories'
+                    ? 'Categories'
+                    : activeTab === 'customers'
+                    ? 'Customers'
+                    : activeTab === 'analytics'
+                    ? 'Analytics'
+                    : 'Settings'}
+                </h1>
+                <p className={styles.subtitle}>
+                  {activeTab === 'orders' && 'View and manage all customer orders in one place.'}
+                  {activeTab === 'categories' && 'Manage categories for your storefront.'}
+                  {activeTab === 'customers' && 'See customer details, status, and value.'}
+                  {activeTab === 'analytics' && 'Overview of your store performance.'}
+                  {activeTab === 'settings' && settingsTab === 'archive' && 'Archive & recovery: restore archived products and customers when needed.'}
+                  {activeTab === 'settings' && settingsTab === 'riders' && 'Manage built-in delivery riders: names, phone, and plate numbers.'}
+                  {activeTab === 'settings' && settingsTab !== 'archive' && settingsTab !== 'riders' && 'Manage store preferences and system settings.'}
+                </p>
+              </>
+            )}
           </div>
 
           <div className={styles.mainPro}>
@@ -1003,144 +1337,122 @@ export default function AdminDashboard() {
                   <div className={`${styles.adminStatCard} ${styles.adminStatSales}`}>
                     <div className={styles.adminStatTop}>
                       <div className={styles.adminStatIcon} aria-hidden>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <rect x="2" y="5" width="20" height="14" rx="2" />
-                          <line x1="2" y1="10" x2="22" y2="10" />
-                        </svg>
+                        <Coins size={16} strokeWidth={1.9} />
                       </div>
-                      <div className={styles.adminStatSpark}>
-                        <ResponsiveContainer width="100%" height={34}>
-                          <LineChart data={sparkRevenue}>
-                            <Line type="monotone" dataKey="v" stroke="#ffffff" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <span className={styles.adminStatTrendPill}>↑ 12.4%</span>
                     </div>
-                    <div className={styles.adminStatValue}>₱{totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2 })} <TrendingUp size={16} strokeWidth={1.5} className={styles.adminStatTrendIcon} aria-hidden /></div>
+                    <div className={styles.adminStatValue}>₱{totalSales.toLocaleString('en-PH', { minimumFractionDigits: 2 })}</div>
                     <div className={styles.adminStatLabel}>Total Sales</div>
                     <div className={styles.adminStatMeta}>Last 30 days</div>
                   </div>
                   <div className={`${styles.adminStatCard} ${styles.adminStatOrders}`}>
                     <div className={styles.adminStatTop}>
                       <div className={styles.adminStatIcon} aria-hidden>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M6 2h12l2 7H4l2-7Z" />
-                          <path d="M4 9h16v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V9Z" />
-                        </svg>
+                        <ShoppingCart size={16} strokeWidth={1.9} />
                       </div>
-                      <div className={styles.adminStatSpark}>
-                        <ResponsiveContainer width="100%" height={34}>
-                          <LineChart data={sparkOrders}>
-                            <Line type="monotone" dataKey="v" stroke="#ffffff" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
+                      <span className={styles.adminStatTrendPill}>↑ 12.4%</span>
                     </div>
-                    <div className={styles.adminStatValue}>{totalOrders} <TrendingUp size={16} strokeWidth={1.5} className={styles.adminStatTrendIcon} aria-hidden /></div>
+                    <div className={styles.adminStatValue}>{totalOrders}</div>
                     <div className={styles.adminStatLabel}>New Orders</div>
                     <div className={styles.adminStatMeta}>Last 30 days</div>
                   </div>
                   <div className={`${styles.adminStatCard} ${styles.adminStatUsers}`}>
                     <div className={styles.adminStatTop}>
                       <div className={styles.adminStatIcon} aria-hidden>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M18 20a6 6 0 0 0-12 0" />
-                          <circle cx="12" cy="10" r="4" />
-                          <circle cx="19" cy="9" r="2" />
-                          <path d="M21 20c0-2-1-3.5-2.5-4.5" />
-                        </svg>
+                        <Users size={16} strokeWidth={1.9} />
                       </div>
-                      <div className={styles.adminStatSpark} />
+                      <span className={styles.adminStatTrendPill}>↑ 12.4%</span>
                     </div>
-                    <div className={styles.adminStatValue}>{totalUsers} <TrendingUp size={16} strokeWidth={1.5} className={styles.adminStatTrendIcon} aria-hidden /></div>
+                    <div className={styles.adminStatValue}>{totalUsers}</div>
                     <div className={styles.adminStatLabel}>Total Users</div>
                     <div className={styles.adminStatMeta}>All time</div>
                   </div>
                 </div>
 
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <h2>Sales Performance</h2>
-                    <button type="button" className={styles.secondaryBtn}>
-                      Last 30 Days
-                    </button>
-                  </div>
-                  <div
-                    className={styles.cardBody}
-                    style={{
-                      minHeight: 260,
-                    }}
-                  >
-                    <div style={{ width: '100%', height: 260 }}>
-                      <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={revenueSeries}>
-                          <defs>
-                            <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
-                              <stop offset="0%" stopColor="#4f46e5" stopOpacity={0.35} />
-                              <stop offset="100%" stopColor="#4f46e5" stopOpacity={0.02} />
-                            </linearGradient>
-                          </defs>
-                          <CartesianGrid strokeDasharray="3 3" stroke="rgba(15,23,42,0.08)" />
-                          <XAxis dataKey="date" tickFormatter={(v) => v.slice(5)} tick={{ fontSize: 12, fill: '#6b7280' }} />
-                          <YAxis tick={{ fontSize: 12, fill: '#6b7280' }} tickFormatter={(v) => `₱${v}`} width={52} />
-                          <Tooltip formatter={(v) => [`₱${Number(v).toFixed(2)}`, 'Revenue']} />
-                          <Area type="monotone" dataKey="revenue" stroke="#4f46e5" strokeWidth={2} fill="url(#rev)" />
-                        </AreaChart>
-                      </ResponsiveContainer>
+                <div className={styles.overviewBottomGrid}>
+                  <div className={styles.card}>
+                    <div className={styles.cardHeader}>
+                      <h2>Sales Performance</h2>
+                      <div className={styles.overviewChartTabs} role="tablist" aria-label="Chart range">
+                        <button type="button" className={styles.overviewChartTab}>7D</button>
+                        <button type="button" className={`${styles.overviewChartTab} ${styles.overviewChartTabActive}`}>30D</button>
+                        <button type="button" className={styles.overviewChartTab}>90D</button>
+                      </div>
+                    </div>
+                    <div className={styles.cardBody} style={{ minHeight: 260 }}>
+                      <div style={{ width: '100%', height: 260 }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={revenueSeries}>
+                            <defs>
+                              <linearGradient id="rev" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stopColor="rgba(59,130,246,0.18)" />
+                                <stop offset="100%" stopColor="rgba(59,130,246,0.05)" />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid vertical={false} stroke="rgba(0,0,0,0.05)" />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={(v) => v.slice(5)}
+                              tick={{ fontSize: 10, fill: '#94a3b8' }}
+                              tickLine={false}
+                              axisLine={false}
+                            />
+                            <YAxis
+                              ticks={[0, 900, 1800, 2700, 3600]}
+                              domain={[0, 3600]}
+                              tick={{ fontSize: 10, fill: '#94a3b8' }}
+                              tickFormatter={(v) => (v >= 1000 ? `₱${(v / 1000).toFixed(1)}k` : `₱${v}`)}
+                              tickLine={false}
+                              axisLine={false}
+                              width={44}
+                            />
+                            <Tooltip formatter={(v) => [`₱${Number(v || 0).toLocaleString('en-PH')}`, 'Revenue']} />
+                            <Area type="monotone" dataKey="revenue" stroke="#3b82f6" strokeWidth={2} fill="url(#rev)" />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <h2>Recent Orders</h2>
-                  </div>
-                  <div className={styles.cardBody}>
-                    <div className={styles.adminTableSearchRow}>
-                      <div className={styles.adminSearchWrap}>
-                        <Search size={20} strokeWidth={1.5} aria-hidden />
+                  <div className={styles.card}>
+                    <div className={styles.cardHeader}>
+                      <h2>Recent Orders</h2>
+                      <button type="button" className={styles.overviewViewAllBtn} onClick={() => setTab('orders')}>
+                        View all →
+                      </button>
+                    </div>
+                    <div className={styles.cardBody}>
+                      {dataLoading ? (
+                        <p>Loading…</p>
+                      ) : overviewRecentOrders.length === 0 ? (
+                        <p className={styles.emptyState}>No orders yet.</p>
+                      ) : (
+                        <div className={styles.overviewRecentList}>
+                          {overviewRecentOrders.map((item) => (
+                            <div key={item.id} className={styles.overviewRecentRow}>
+                              <div className={`${styles.overviewRecentAvatar} ${item.avatarClass}`}>{item.initials}</div>
+                              <div className={styles.overviewRecentMeta}>
+                                <div className={styles.overviewRecentName}>{item.customerName}</div>
+                                <div className={styles.overviewRecentOrderCode}>{item.orderCode}</div>
+                              </div>
+                              <div className={styles.overviewRecentAmountWrap}>
+                                <div className={styles.overviewRecentAmount}>₱{item.amount.toLocaleString('en-PH')}</div>
+                                <span className={`${styles.overviewRecentStatus} ${item.statusClass}`}>{item.statusLabel}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      <div className={styles.overviewRecentSearch}>
+                        <Search size={14} strokeWidth={1.8} aria-hidden />
                         <input
                           type="search"
                           value={overviewOrdersSearch}
                           onChange={(e) => setOverviewOrdersSearch(e.target.value)}
-                          placeholder="Search recent orders…"
+                          placeholder="Search recent orders"
                         />
                       </div>
                     </div>
-                    {dataLoading ? (
-                      <p>Loading…</p>
-                    ) : overviewFilteredOrders.length === 0 ? (
-                      <p className={styles.emptyState}>No orders yet.</p>
-                    ) : (
-                      <div className={styles.usersTable}>
-                        <table>
-                          <thead>
-                            <tr>
-                              <th>Order</th>
-                              <th>Customer</th>
-                              <th>Status</th>
-                              <th>Total</th>
-                              <th>Date</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {overviewFilteredOrders.slice(0, 6).map((o) => (
-                              <tr key={o.id}>
-                                <td>#{o.order_number || o.id}</td>
-                                <td>{o.customer?.name || '-'}</td>
-                                <td>
-                                  <span className={`${styles.adminStatusPill} ${statusPillClass(o.status)}`}>
-                                    {formatOrderStatusLabel(o.status)}
-                                  </span>
-                                </td>
-                                <td>₱{Number(o.total_amount || 0).toFixed(2)}</td>
-                                <td>{o.created_at ? new Date(o.created_at).toLocaleDateString() : ''}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
                   </div>
                 </div>
               </>
@@ -1250,8 +1562,34 @@ export default function AdminDashboard() {
                                         {formatOrderStatusLabel(o.status)}
                                       </span>
                                     </td>
-                                    <td>
-                                      {o.rider?.user?.name ? (
+                                    <td onClick={(e) => e.stopPropagation()}>
+                                      {(String(o.status || '').toLowerCase() === 'shipped') ? (
+                                        <div className={styles.adminOrderRiderCell}>
+                                          <label htmlFor={`admin-track-assign-rider-${o.id}`} className={styles.adminOrderRiderLabel}>
+                                            Assign rider
+                                          </label>
+                                          <select
+                                            id={`admin-track-assign-rider-${o.id}`}
+                                            className={styles.adminOrderRiderSelect}
+                                            value={o.rider_id ?? o.rider?.id ? String(o.rider_id ?? o.rider?.id) : ''}
+                                            disabled={assigningRiderOrderId === o.id}
+                                            onChange={(e) => {
+                                              const v = e.target.value;
+                                              const current = Number(o.rider_id ?? o.rider?.id ?? 0);
+                                              if (!v || Number(v) === current) return;
+                                              handleAssignAdminRider(o.id, Number(v));
+                                            }}
+                                          >
+                                            <option value="">Select rider…</option>
+                                            {fleetRiders.map((r) => (
+                                              <option key={r.id} value={String(r.id)}>
+                                                {r.name}
+                                                {r.status === 'busy' ? ' (busy)' : ''}
+                                              </option>
+                                            ))}
+                                          </select>
+                                        </div>
+                                      ) : o.rider?.user?.name ? (
                                         <span className={styles.adminOrderRiderName}>
                                           <Bike size={16} strokeWidth={2} aria-hidden />
                                           {o.rider.user.name}
@@ -1666,6 +2004,69 @@ export default function AdminDashboard() {
               </div>
             )}
 
+            {selectedProduct && (
+              <div
+                className={styles.modalOverlay}
+                onClick={() => setSelectedProduct(null)}
+              >
+                <div
+                  className={styles.modal}
+                  style={{ maxWidth: 560 }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h2>Product details</h2>
+                  <p style={{ fontSize: 14, color: '#6b7280', marginTop: -8, marginBottom: 18 }}>
+                    #{selectedProduct.id}
+                  </p>
+                  <div className={styles.adminProductDetailLayout}>
+                    <img
+                      src={productImageUrl(selectedProduct.image) || 'https://placehold.co/180x220'}
+                      alt={selectedProduct.name}
+                      className={styles.adminProductDetailImage}
+                      onError={(e) => { e.target.src = 'https://placehold.co/180x220'; }}
+                    />
+                    <div className={styles.adminProductDetailMeta}>
+                      <div className={styles.adminProductDetailName}>{selectedProduct.name}</div>
+                      <div className={styles.adminProductDetailText}>Category: {selectedProduct.category}</div>
+                      <div className={styles.adminProductDetailText}>Seller: {selectedProduct.seller_name || '—'}</div>
+                      <div className={styles.adminProductDetailText}>Status: {selectedProduct.approval_status || 'approved'}</div>
+                      <div className={styles.adminProductDetailText}>
+                        Price: ₱{Number(selectedProduct.price || 0).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                    </div>
+                  </div>
+                  {selectedProduct.description ? (
+                    <p className={styles.adminProductDetailDescription}>{selectedProduct.description}</p>
+                  ) : null}
+                  <div className={styles.adminProductDetailStats}>
+                    <div className={styles.adminProductDetailStatCard}>
+                      <span>Stock on hand</span>
+                      <strong>{Number(selectedProduct.stock || 0).toLocaleString('en-PH')}</strong>
+                    </div>
+                    <div className={styles.adminProductDetailStatCard}>
+                      <span>Sold units</span>
+                      <strong>{Number(selectedProduct.units_sold || 0).toLocaleString('en-PH')}</strong>
+                    </div>
+                    <div className={styles.adminProductDetailStatCard}>
+                      <span>Total amount</span>
+                      <strong>
+                        ₱
+                        {Number(selectedProduct.sales_total || 0).toLocaleString('en-PH', {
+                          minimumFractionDigits: 2,
+                          maximumFractionDigits: 2,
+                        })}
+                      </strong>
+                    </div>
+                  </div>
+                  <div style={{ marginTop: 16, display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                    <button type="button" className={styles.secondaryBtn} onClick={() => setSelectedProduct(null)}>
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {confirmDialog && (
               <div
                 className={styles.modalOverlay}
@@ -1702,6 +2103,7 @@ export default function AdminDashboard() {
                   if (productCreating) return;
                   setAddProductOpen(false);
                   resetNewProductForm();
+                  resetNewProductImageDraft();
                 }}
               >
                 <div
@@ -1779,15 +2181,157 @@ export default function AdminDashboard() {
                         ))}
                       </select>
                     </div>
-                    <div className={styles.formGroup}>
-                      <label htmlFor="np-img" className={styles.adminLabel}>Image URL</label>
-                      <input
-                        id="np-img"
-                        type="url"
-                        value={newProduct.image}
-                        onChange={(e) => setNewProduct((p) => ({ ...p, image: e.target.value }))}
-                        placeholder="https://…"
-                      />
+                    <div className={styles.adminProductMediaCard}>
+                      <span className={styles.adminLabel}>Product image</span>
+                      <div
+                        className={styles.adminProductMediaTabs}
+                        role="tablist"
+                        aria-label="Product image source"
+                      >
+                        <button
+                          type="button"
+                          role="tab"
+                          id="np-media-tab-url"
+                          aria-selected={productMediaTab === 'url'}
+                          className={
+                            productMediaTab === 'url'
+                              ? `${styles.adminProductMediaTab} ${styles.adminProductMediaTabActive}`
+                              : styles.adminProductMediaTab
+                          }
+                          onClick={() => switchProductMediaTab('url')}
+                        >
+                          Image URL
+                        </button>
+                        <button
+                          type="button"
+                          role="tab"
+                          id="np-media-tab-file"
+                          aria-selected={productMediaTab === 'file'}
+                          className={
+                            productMediaTab === 'file'
+                              ? `${styles.adminProductMediaTab} ${styles.adminProductMediaTabActive}`
+                              : styles.adminProductMediaTab
+                          }
+                          onClick={() => switchProductMediaTab('file')}
+                        >
+                          Upload file
+                        </button>
+                      </div>
+
+                      {productMediaTab === 'url' ? (
+                        <div
+                          className={styles.formGroup}
+                          style={{ marginBottom: 0, marginTop: 12 }}
+                          role="tabpanel"
+                          aria-labelledby="np-media-tab-url"
+                        >
+                          <label htmlFor="np-img" className={styles.adminLabel}>Paste image link</label>
+                          <input
+                            id="np-img"
+                            type="url"
+                            value={newProduct.image}
+                            onChange={(e) => setNewProduct((p) => ({ ...p, image: e.target.value }))}
+                            placeholder="https://…"
+                            autoComplete="off"
+                          />
+                        </div>
+                      ) : (
+                        <div
+                          role="tabpanel"
+                          aria-labelledby="np-media-tab-file"
+                          style={{ marginTop: 12 }}
+                        >
+                          <input
+                            ref={newProductFileInputRef}
+                            id="np-img-file"
+                            type="file"
+                            accept={PRODUCT_IMAGE_ACCEPT}
+                            className={styles.adminProductFileInputHidden}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              commitProductImageFile(file);
+                            }}
+                          />
+                          <button
+                            type="button"
+                            className={
+                              productMediaDragActive
+                                ? `${styles.adminProductDropZone} ${styles.adminProductDropZoneActive}`
+                                : styles.adminProductDropZone
+                            }
+                            onClick={() => newProductFileInputRef.current?.click()}
+                            onDragOver={(ev) => {
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                              setProductMediaDragActive(true);
+                            }}
+                            onDragEnter={(ev) => {
+                              ev.preventDefault();
+                              setProductMediaDragActive(true);
+                            }}
+                            onDragLeave={(ev) => {
+                              ev.preventDefault();
+                              setProductMediaDragActive(false);
+                            }}
+                            onDrop={(ev) => {
+                              ev.preventDefault();
+                              ev.stopPropagation();
+                              setProductMediaDragActive(false);
+                              const file = ev.dataTransfer?.files?.[0];
+                              if (file) commitProductImageFile(file);
+                            }}
+                          >
+                            <span className={styles.adminProductDropZoneInner}>
+                              <ImagePlus size={28} strokeWidth={1.75} aria-hidden />
+                              <span>
+                                <strong>Drop an image here</strong>
+                                <span className={styles.adminProductDropSub}> or click to browse</span>
+                              </span>
+                              <span className={styles.adminProductMediaHint}>
+                                JPG, PNG, or WebP · max 5&nbsp;MB
+                              </span>
+                            </span>
+                          </button>
+                        </div>
+                      )}
+
+                      <p className={styles.adminProductMediaFootnote}>
+                        Optional. Uploaded images are saved on the server; the API stores a permanent path you can also replace with a full image URL above.
+                      </p>
+
+                      {(() => {
+                        const previewSrc =
+                          productMediaTab === 'file'
+                            ? newProductImagePreview
+                            : (productImageUrl(newProduct.image.trim()) || newProduct.image.trim());
+                        const showPreview =
+                          productMediaTab === 'file'
+                            ? Boolean(newProductImagePreview)
+                            : Boolean(newProduct.image.trim());
+                        if (!showPreview || !previewSrc) return null;
+                        return (
+                          <div className={styles.adminProductPreviewBlock}>
+                            <span className={styles.adminLabel}>Preview</span>
+                            <div className={styles.adminProductPreviewBox}>
+                              <img
+                                className={styles.adminProductPreviewImg}
+                                src={previewSrc}
+                                alt="Selected product image preview"
+                              />
+                            </div>
+                            <div className={styles.adminProductPreviewActions}>
+                              <button
+                                type="button"
+                                className={styles.secondaryBtn}
+                                onClick={clearProductMediaSelection}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div className={styles.formGroup}>
                       <span className={styles.adminLabel} id="np-sizes-label">Sizes</span>
@@ -1873,6 +2417,7 @@ export default function AdminDashboard() {
                         onClick={() => {
                           setAddProductOpen(false);
                           resetNewProductForm();
+                          resetNewProductImageDraft();
                         }}
                       >
                         Cancel
@@ -1887,23 +2432,53 @@ export default function AdminDashboard() {
             )}
 
             {activeTab === 'products' && (
-              <div className={styles.card}>
-                <div className={styles.cardHeader}>
-                  <h2>All products</h2>
-                  <button type="button" className={styles.adminSaveBtn} onClick={() => { resetNewProductForm(); setAddProductOpen(true); }}>
-                    <Plus size={18} strokeWidth={2} aria-hidden />
-                    Add product
-                  </button>
+              <div className={styles.productsPageRoot}>
+                <div className={styles.productsKpiGrid}>
+                  <div className={`${styles.productsKpiCard} ${styles.productsKpiCardBlue}`}>
+                    <div className={styles.productsKpiLabel}>Total Products</div>
+                    <div className={`${styles.productsKpiValue} ${styles.productsKpiValueNeutral}`}>
+                      {productsKpiCounts.total}
+                    </div>
+                    <div className={styles.productsKpiSub}>All listings</div>
+                  </div>
+                  <div className={`${styles.productsKpiCard} ${styles.productsKpiCardGreen}`}>
+                    <div className={styles.productsKpiLabel}>Live</div>
+                    <div className={`${styles.productsKpiValue} ${styles.productsKpiValueLive}`}>
+                      {productsKpiCounts.live}
+                    </div>
+                    <div className={styles.productsKpiSub}>Published</div>
+                  </div>
+                  <div className={`${styles.productsKpiCard} ${styles.productsKpiCardAmber}`}>
+                    <div className={styles.productsKpiLabel}>Pending</div>
+                    <div className={`${styles.productsKpiValue} ${styles.productsKpiValuePending}`}>
+                      {productsKpiCounts.pending}
+                    </div>
+                    <div className={styles.productsKpiSub}>Awaiting approval</div>
+                  </div>
+                  <div className={`${styles.productsKpiCard} ${styles.productsKpiCardRed}`}>
+                    <div className={styles.productsKpiLabel}>Rejected</div>
+                    <div className={`${styles.productsKpiValue} ${styles.productsKpiValueRejected}`}>
+                      {productsKpiCounts.rejected}
+                    </div>
+                    <div className={styles.productsKpiSub}>Needs revision</div>
+                  </div>
                 </div>
-                <div className={styles.cardBody}>
-                  <div
-                    role="tablist"
-                    aria-label="Filter products"
-                    style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}
-                  >
+
+                <div className={styles.productsToolbar}>
+                  <label className={styles.productsSearchField}>
+                    <Search size={16} strokeWidth={2} aria-hidden />
+                    <input
+                      type="search"
+                      value={productsSearch}
+                      onChange={(e) => setProductsSearch(e.target.value)}
+                      placeholder="Search products by name, category, or seller..."
+                      autoComplete="off"
+                    />
+                  </label>
+                  <div className={styles.productsFilterTabs} role="tablist" aria-label="Filter products">
                     {[
                       { key: 'all', label: 'All' },
-                      { key: 'pending', label: 'Pending approval' },
+                      { key: 'pending', label: 'Pending' },
                       { key: 'live', label: 'Live' },
                       { key: 'rejected', label: 'Rejected' },
                     ].map(({ key, label }) => (
@@ -1912,316 +2487,477 @@ export default function AdminDashboard() {
                         type="button"
                         role="tab"
                         aria-selected={productsScopeTab === key}
-                        className={styles.secondaryBtn}
-                        style={{
-                          fontWeight: 800,
-                          borderRadius: 10,
-                          borderWidth: 2,
-                          borderColor: productsScopeTab === key ? '#2563eb' : undefined,
-                          background: productsScopeTab === key ? '#eff6ff' : undefined,
-                          color: productsScopeTab === key ? '#1d4ed8' : undefined,
-                        }}
+                        className={
+                          productsScopeTab === key
+                            ? `${styles.productsFilterTab} ${styles.productsFilterTabActive}`
+                            : styles.productsFilterTab
+                        }
                         onClick={() => setProductsScopeTab(key)}
                       >
                         {label}
                       </button>
                     ))}
                   </div>
-                  <div className={styles.adminTableSearchRow}>
-                    <div className={styles.adminSearchWrap}>
-                      <Search size={20} strokeWidth={1.5} aria-hidden />
-                      <input
-                        type="search"
-                        value={productsSearch}
-                        onChange={(e) => setProductsSearch(e.target.value)}
-                        placeholder="Search products by name, category, or seller…"
-                      />
-                    </div>
+                </div>
+
+                {selectedProductIds.length > 0 && (
+                  <div className={styles.adminBatchBar}>
+                    <span className={styles.adminBatchHint}>{selectedProductIds.length} selected</span>
+                    <button type="button" className={styles.adminBtnArchive} onClick={requestBatchArchiveProducts}>
+                      <Archive size={16} strokeWidth={1.75} aria-hidden />
+                      Archive selected
+                    </button>
                   </div>
-                  {selectedProductIds.length > 0 && (
-                    <div className={styles.adminBatchBar}>
-                      <span className={styles.adminBatchHint}>{selectedProductIds.length} selected</span>
-                      <button type="button" className={styles.adminBtnArchive} onClick={requestBatchArchiveProducts}>
-                        <Archive size={16} strokeWidth={1.75} aria-hidden />
-                        Archive selected
-                      </button>
-                    </div>
-                  )}
+                )}
+
+                <div className={styles.productsTableCard}>
                   {dataLoading ? (
-                    <p>Loading products…</p>
+                    <p className={styles.productsTableLoading}>Loading products…</p>
                   ) : filteredProducts.length === 0 ? (
                     <p className={styles.emptyState}>No products found.</p>
                   ) : (
-                    <div className={styles.usersTable}>
-                      <table>
-                        <thead>
-                          <tr>
-                            <th style={{ width: 40 }}>
-                              <input
-                                type="checkbox"
-                                className={styles.adminTableCheckbox}
-                                checked={
-                                  filteredProducts.length > 0
-                                  && filteredProducts.every((p) => selectedProductIds.includes(p.id))
-                                }
-                                onChange={(e) => {
-                                  if (e.target.checked) {
-                                    setSelectedProductIds(filteredProducts.map((p) => p.id));
-                                  } else {
-                                    setSelectedProductIds([]);
-                                  }
-                                }}
-                                aria-label="Select all visible products"
-                              />
-                            </th>
-                            <th>Product</th>
-                            <th>Status</th>
-                            <th>Seller</th>
-                            <th>Category</th>
-                            <th>Stock</th>
-                            <th>Price</th>
-                            <th style={{ textAlign: 'right' }}>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {filteredProducts.map((p) => (
-                            <tr key={p.id}>
-                              <td>
+                    <>
+                      <div className={styles.productsTableWrap}>
+                        <table className={styles.productsTable}>
+                          <thead>
+                            <tr>
+                              <th className={styles.productsThCheck}>
                                 <input
                                   type="checkbox"
-                                  className={styles.adminTableCheckbox}
-                                  checked={selectedProductIds.includes(p.id)}
-                                  onChange={() => {
-                                    setSelectedProductIds((prev) => (
-                                      prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
-                                    ));
+                                  className={styles.productsTableCheckbox}
+                                  checked={
+                                    productsPaginatedRows.length > 0
+                                    && productsPaginatedRows.every((p) => selectedProductIds.includes(p.id))
+                                  }
+                                  onChange={(e) => {
+                                    const pageIds = productsPaginatedRows.map((p) => p.id);
+                                    if (e.target.checked) {
+                                      setSelectedProductIds((prev) => [...new Set([...prev, ...pageIds])]);
+                                    } else {
+                                      setSelectedProductIds((prev) => prev.filter((id) => !pageIds.includes(id)));
+                                    }
                                   }}
-                                  aria-label={`Select ${p.name}`}
+                                  aria-label="Select all on this page"
                                 />
-                              </td>
-                              <td>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                  <img
-                                    src={productImageUrl(p.image) || 'https://placehold.co/40x40'}
-                                    alt=""
-                                    width={46}
-                                    height={46}
-                                    className={styles.adminProductImg}
-                                    onError={(e) => { e.target.src = 'https://placehold.co/40x40'; }}
-                                  />
-                                  <span>{p.name}</span>
-                                </div>
-                              </td>
-                              <td>
-                                {(p.approval_status || 'approved') === 'pending' && (
-                                  <span style={{ fontSize: 12, fontWeight: 800, color: '#b45309', background: '#fffbeb', padding: '4px 8px', borderRadius: 8 }}>Pending</span>
-                                )}
-                                {(p.approval_status || 'approved') === 'approved' && (
-                                  <span style={{ fontSize: 12, fontWeight: 800, color: '#15803d', background: '#ecfdf5', padding: '4px 8px', borderRadius: 8 }}>Live</span>
-                                )}
-                                {(p.approval_status || '') === 'rejected' && (
-                                  <span style={{ fontSize: 12, fontWeight: 800, color: '#b91c1c', background: '#fef2f2', padding: '4px 8px', borderRadius: 8 }}>Rejected</span>
-                                )}
-                              </td>
-                              <td>{p.seller?.name || '-'}</td>
-                              <td>{p.category?.name || '-'}</td>
-                              <td>
-                                <span
-                                  className={`${styles.adminStock} ${
-                                    (p.stock ?? 0) === 0
-                                      ? styles.adminStockZero
-                                      : (p.stock ?? 0) <= 5
-                                      ? styles.adminStockLow
-                                      : ''
-                                  }`}
-                                >
-                                  {p.stock ?? 0}
-                                </span>
-                                {(p.stock ?? 0) > 0 && (p.stock ?? 0) <= 5 && (
-                                  <span className={styles.adminLowStockLabel}>Low Stock</span>
-                                )}
-                                {p.sales_cap_quantity ? (
-                                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 4 }}>
-                                    Cap: {p.sales_cap_quantity}/{p.sales_cap_period === 'year' ? 'yr' : 'mo'}
-                                  </div>
-                                ) : null}
-                              </td>
-                              <td>₱{Number(p.price || 0).toFixed(2)}</td>
-                              <td style={{ textAlign: 'right' }}>
-                                <div style={{ display: 'inline-flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                                  {(p.approval_status || 'approved') === 'pending' && (
-                                    <>
-                                      <button
-                                        type="button"
-                                        className={styles.adminSaveBtn}
-                                        title="Publish to store"
-                                        disabled={productApprovalLoadingId === p.id}
-                                        onClick={() => handleApproveProduct(p.id)}
-                                      >
-                                        <BadgeCheck size={16} strokeWidth={2} aria-hidden />
-                                        <span className={styles.adminActionText}>Publish</span>
-                                      </button>
-                                      <button
-                                        type="button"
-                                        className={styles.adminBtnDeleteSoft}
-                                        title="Reject listing"
-                                        disabled={productApprovalLoadingId === p.id}
-                                        onClick={() => handleRejectProduct(p.id)}
-                                      >
-                                        <X size={16} strokeWidth={2} aria-hidden />
-                                        <span className={styles.adminActionText}>Reject</span>
-                                      </button>
-                                    </>
-                                  )}
-                                  <button
-                                    type="button"
-                                    className={styles.adminBtnArchive}
-                                    title="Archive product"
-                                    onClick={() => setConfirmDialog({ mode: 'archive-product', id: p.id })}
-                                  >
-                                    <Archive size={16} strokeWidth={1.75} aria-hidden />
-                                    <span className={styles.adminActionText}>Archive</span>
-                                  </button>
-                                </div>
-                              </td>
+                              </th>
+                              <th>Product</th>
+                              <th>Status</th>
+                              <th>Seller</th>
+                              <th>Category</th>
+                              <th>Stock</th>
+                              <th>Price</th>
+                              <th style={{ textAlign: 'right' }}>Actions</th>
                             </tr>
+                          </thead>
+                          <tbody>
+                            {productsPaginatedRows.map((p) => {
+                              const st = (p.approval_status || 'approved').toLowerCase();
+                              const stockN = Number(p.stock ?? 0);
+                              let statusCls = styles.productsStatusLive;
+                              let statusLabel = 'Live';
+                              if (st === 'pending') {
+                                statusCls = styles.productsStatusPending;
+                                statusLabel = 'Pending';
+                              } else if (st === 'rejected') {
+                                statusCls = styles.productsStatusRejected;
+                                statusLabel = 'Rejected';
+                              }
+                              return (
+                                <tr
+                                  key={p.id}
+                                  className={styles.productsTableRow}
+                                  onClick={() => openProductDetails(p)}
+                                >
+                                  <td onClick={(e) => e.stopPropagation()}>
+                                    <input
+                                      type="checkbox"
+                                      className={styles.productsTableCheckbox}
+                                      checked={selectedProductIds.includes(p.id)}
+                                      onChange={() => {
+                                        setSelectedProductIds((prev) => (
+                                          prev.includes(p.id) ? prev.filter((x) => x !== p.id) : [...prev, p.id]
+                                        ));
+                                      }}
+                                      aria-label={`Select ${p.name}`}
+                                    />
+                                  </td>
+                                  <td>
+                                    <div className={styles.productsProductCell}>
+                                      <img
+                                        src={productImageUrl(p.image) || 'https://placehold.co/40x40'}
+                                        alt=""
+                                        width={46}
+                                        height={46}
+                                        className={styles.productsProductThumb}
+                                        onError={(e) => { e.target.src = 'https://placehold.co/40x40'; }}
+                                      />
+                                      <div>
+                                        <div className={styles.productsProductName}>{p.name}</div>
+                                        <div className={styles.productsProductSku}>{formatInventorySku(p.id)}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className={`${styles.productsStatusPill} ${statusCls}`}>
+                                      <span className={styles.productsStatusDot} aria-hidden />
+                                      {statusLabel}
+                                    </span>
+                                  </td>
+                                  <td className={styles.productsSellerCell}>{p.seller?.name || '—'}</td>
+                                  <td>
+                                    <span className={styles.productsCategoryPill}>{p.category?.name || '—'}</span>
+                                  </td>
+                                  <td>
+                                    <span className={styles.productsStockWrap}>
+                                      <span className={styles.productsStockNum}>{stockN}</span>
+                                      {stockN <= 2 ? (
+                                        <span className={styles.productsLowTag}>Low</span>
+                                      ) : null}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <span className={styles.productsPriceMono}>
+                                      ₱
+                                      {Number(p.price || 0).toLocaleString('en-PH', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                                    <div className={styles.productsActions}>
+                                      <button
+                                        type="button"
+                                        className={styles.productsBtnEdit}
+                                        title="Edit"
+                                        aria-label="Edit product"
+                                        onClick={() => openProductDetails(p)}
+                                      >
+                                        <Pencil size={14} strokeWidth={2} aria-hidden />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={styles.productsBtnArchive}
+                                        title="Archive product"
+                                        aria-label="Archive product"
+                                        onClick={() => setConfirmDialog({ mode: 'archive-product', id: p.id })}
+                                      >
+                                        <Archive size={14} strokeWidth={2} aria-hidden />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className={styles.productsPagination}>
+                        <span className={styles.productsPaginationSummary}>
+                          {(() => {
+                            const total = filteredProducts.length;
+                            if (total === 0) return 'Showing 0 of 0 products';
+                            const from = (productsTablePage - 1) * PRODUCTS_PAGE_SIZE + 1;
+                            const to = Math.min(productsTablePage * PRODUCTS_PAGE_SIZE, total);
+                            return `Showing ${from}–${to} of ${total} products`;
+                          })()}
+                        </span>
+                        <div className={styles.productsPaginationControls}>
+                          <button
+                            type="button"
+                            className={styles.productsPageBtn}
+                            disabled={productsTablePage <= 1}
+                            aria-label="Previous page"
+                            onClick={() => setProductsTablePage((x) => Math.max(1, x - 1))}
+                          >
+                            ‹
+                          </button>
+                          {Array.from({ length: productsPageCount }, (_, i) => i + 1).map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              className={
+                                num === productsTablePage
+                                  ? `${styles.productsPageBtn} ${styles.productsPageBtnActive}`
+                                  : styles.productsPageBtn
+                              }
+                              aria-current={num === productsTablePage ? 'page' : undefined}
+                              onClick={() => setProductsTablePage(num)}
+                            >
+                              {num}
+                            </button>
                           ))}
-                        </tbody>
-                      </table>
-                    </div>
+                          <button
+                            type="button"
+                            className={styles.productsPageBtn}
+                            disabled={productsTablePage >= productsPageCount}
+                            aria-label="Next page"
+                            onClick={() => setProductsTablePage((x) => Math.min(productsPageCount, x + 1))}
+                          >
+                            ›
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
                 </div>
               </div>
             )}
 
             {activeTab === 'inventory' && (
-              <>
-                <div className={styles.adminStatsGrid} style={{ marginBottom: 20 }}>
-                  <div className={`${styles.adminStatCard} ${styles.adminStatSales}`}>
-                    <div className={styles.adminStatTop}>
-                      <div className={styles.adminStatIcon} aria-hidden>
-                        <PackageSearch size={18} strokeWidth={1.75} />
-                      </div>
-                    </div>
-                    <div className={styles.adminStatValue}>
-                      {(inventoryTotals.total_units_sold ?? 0).toLocaleString('en-PH')}
-                    </div>
-                    <div className={styles.adminStatLabel}>Total units sold</div>
-                    <div className={styles.adminStatMeta}>All non-cancelled orders</div>
+              <div className={styles.inventoryPageRoot}>
+                <div className={styles.inventoryKpiGrid}>
+                  <div className={`${styles.inventoryKpiCard} ${styles.inventoryKpiCardBlue}`}>
+                    <div className={styles.inventoryKpiLabel}>Total Products</div>
+                    <div className={styles.inventoryKpiValue}>{inventoryKpiCounts.total}</div>
                   </div>
-                  <div className={`${styles.adminStatCard} ${styles.adminStatOrders}`}>
-                    <div className={styles.adminStatTop}>
-                      <div className={styles.adminStatIcon} aria-hidden>
-                        <TrendingUp size={18} strokeWidth={1.75} />
-                      </div>
+                  <div className={`${styles.inventoryKpiCard} ${styles.inventoryKpiCardGreen}`}>
+                    <div className={styles.inventoryKpiLabel}>In Stock</div>
+                    <div className={styles.inventoryKpiValue}>{inventoryKpiCounts.inStock}</div>
+                    <div className={styles.inventoryKpiSub}>Ready to sell</div>
+                  </div>
+                  <div className={`${styles.inventoryKpiCard} ${styles.inventoryKpiCardAmber}`}>
+                    <div className={styles.inventoryKpiLabel}>Low Stock</div>
+                    <div className={`${styles.inventoryKpiValue} ${styles.inventoryKpiValueWarn}`}>
+                      {inventoryKpiCounts.low}
                     </div>
-                    <div className={styles.adminStatValue}>
-                      ₱
-                      {Number(inventoryTotals.total_sales_amount ?? 0).toLocaleString('en-PH', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                    <div className={styles.inventoryKpiSub}>Needs restock soon</div>
+                  </div>
+                  <div className={`${styles.inventoryKpiCard} ${styles.inventoryKpiCardRed}`}>
+                    <div className={styles.inventoryKpiLabel}>Out of Stock</div>
+                    <div className={`${styles.inventoryKpiValue} ${styles.inventoryKpiValueDanger}`}>
+                      {inventoryKpiCounts.out}
                     </div>
-                    <div className={styles.adminStatLabel}>Total sales (line totals)</div>
-                    <div className={styles.adminStatMeta}>Σ qty × line price</div>
+                    <div className={styles.inventoryKpiSub}>Unavailable to buyers</div>
                   </div>
                 </div>
-                <div className={styles.card}>
-                  <div className={styles.cardHeader}>
-                    <h2>Sales by product</h2>
-                  </div>
-                  <div className={styles.cardBody}>
-                    <div
-                      className={styles.adminTableSearchRow}
-                      style={{ display: 'flex', flexWrap: 'wrap', gap: 12, alignItems: 'center' }}
-                    >
-                      <div className={styles.adminSearchWrap} style={{ flex: '1 1 220px' }}>
-                        <Search size={20} strokeWidth={1.5} aria-hidden />
-                        <input
-                          type="search"
-                          value={inventorySearch}
-                          onChange={(e) => setInventorySearch(e.target.value)}
-                          placeholder="Search by product or category…"
-                        />
-                      </div>
+
+                <div className={styles.inventoryToolbar}>
+                  <label className={styles.inventorySearchField}>
+                    <Search size={16} strokeWidth={2} aria-hidden />
+                    <input
+                      type="search"
+                      value={inventorySearch}
+                      onChange={(e) => setInventorySearch(e.target.value)}
+                      placeholder="Search by name, category, or seller..."
+                      autoComplete="off"
+                    />
+                  </label>
+                  <div className={styles.inventoryFilterTabs} role="tablist" aria-label="Stock filter">
+                    {[
+                      { key: 'all', label: 'All' },
+                      { key: 'in', label: 'In Stock' },
+                      { key: 'low', label: 'Low Stock' },
+                      { key: 'out', label: 'Out of Stock' },
+                    ].map(({ key, label }) => (
                       <button
+                        key={key}
                         type="button"
-                        className={styles.secondaryBtn}
-                        style={{ flexShrink: 0 }}
-                        disabled={inventoryLoading}
-                        onClick={() => {
-                          setInventoryLoading(true);
-                          fetchAdminInventoryReport()
-                            .then((res) => {
-                              setInventoryRows(res.data?.products || []);
-                              setInventoryTotals(res.data?.totals || { total_units_sold: 0, total_sales_amount: 0 });
-                            })
-                            .catch(() => {
-                              setInventoryRows([]);
-                              setInventoryTotals({ total_units_sold: 0, total_sales_amount: 0 });
-                            })
-                            .finally(() => setInventoryLoading(false));
-                        }}
+                        role="tab"
+                        aria-selected={inventoryStockFilter === key}
+                        className={
+                          inventoryStockFilter === key
+                            ? `${styles.inventoryFilterTab} ${styles.inventoryFilterTabActive}`
+                            : styles.inventoryFilterTab
+                        }
+                        onClick={() => setInventoryStockFilter(key)}
                       >
-                        <RefreshCw size={16} strokeWidth={1.75} aria-hidden />
-                        Refresh
+                        {label}
                       </button>
-                    </div>
-                    {inventoryLoading ? (
-                      <p>Loading…</p>
-                    ) : filteredInventoryRows.length === 0 ? (
-                      <p className={styles.emptyState}>
-                        {(inventoryRows || []).length === 0
-                          ? 'No active products in catalog.'
-                          : 'No products match your search.'}
-                      </p>
-                    ) : (
-                      <div className={styles.usersTable}>
-                        <table>
+                    ))}
+                  </div>
+                  <button type="button" className={styles.inventoryFilterIconBtn} title="Filters" aria-label="Filters">
+                    <Filter size={16} strokeWidth={2} aria-hidden />
+                  </button>
+                  <button
+                    type="button"
+                    className={styles.inventoryFilterIconBtn}
+                    title="Refresh inventory"
+                    aria-label="Refresh inventory"
+                    disabled={inventoryLoading}
+                    onClick={() => {
+                      setInventoryLoading(true);
+                      fetchAdminInventoryReport()
+                        .then((res) => {
+                          setInventoryRows(res.data?.products || []);
+                          setInventoryTotals(res.data?.totals || { total_units_sold: 0, total_sales_amount: 0 });
+                        })
+                        .catch(() => {
+                          setInventoryRows([]);
+                          setInventoryTotals({ total_units_sold: 0, total_sales_amount: 0 });
+                        })
+                        .finally(() => setInventoryLoading(false));
+                    }}
+                  >
+                    <RefreshCw size={16} strokeWidth={2} aria-hidden />
+                  </button>
+                </div>
+
+                <div className={styles.inventoryTableCard}>
+                  {inventoryLoading ? (
+                    <p className={styles.inventoryTableLoading}>Loading…</p>
+                  ) : inventoryDisplayRows.length === 0 ? (
+                    <p className={styles.emptyState}>
+                      {(inventoryRows || []).length === 0
+                        ? 'No active products in catalog.'
+                        : 'No products match your search.'}
+                    </p>
+                  ) : (
+                    <>
+                      <div className={styles.inventoryTableWrap}>
+                        <table className={styles.inventoryTable}>
                           <thead>
                             <tr>
                               <th>Product</th>
-                              <th>Category</th>
+                              <th>Status</th>
                               <th>Stock</th>
-                              <th>Units sold</th>
-                              <th style={{ textAlign: 'right' }}>Sales total</th>
+                              <th>Stocks sold</th>
+                              <th style={{ textAlign: 'right' }}>Price</th>
+                              <th style={{ textAlign: 'right' }}>Total</th>
                             </tr>
                           </thead>
                           <tbody>
-                            {filteredInventoryRows.map((row) => (
-                              <tr key={row.id}>
-                                <td>{row.name}</td>
-                                <td>{row.category || '—'}</td>
-                                <td>
-                                  <span
-                                    className={`${styles.adminStock} ${
-                                      (row.stock ?? 0) === 0
-                                        ? styles.adminStockZero
-                                        : (row.stock ?? 0) <= 5
-                                        ? styles.adminStockLow
-                                        : ''
-                                    }`}
-                                  >
-                                    {row.stock ?? 0}
-                                  </span>
-                                </td>
-                                <td>{(row.units_sold ?? 0).toLocaleString('en-PH')}</td>
-                                <td style={{ textAlign: 'right', fontWeight: 700 }}>
-                                  ₱
-                                  {Number(row.sales_total ?? 0).toLocaleString('en-PH', {
-                                    minimumFractionDigits: 2,
-                                    maximumFractionDigits: 2,
-                                  })}
-                                </td>
-                              </tr>
-                            ))}
+                            {inventoryPaginatedRows.map((row) => {
+                              const stockNum = Number(row.stock ?? 0);
+                              const fillPct = inventoryMaxStockBar > 0
+                                ? Math.min(100, (stockNum / inventoryMaxStockBar) * 100)
+                                : 0;
+                              let barFillClass = styles.inventoryStockFillGreen;
+                              if (stockNum <= 1) barFillClass = styles.inventoryStockFillRed;
+                              else if (stockNum >= 2 && stockNum <= 9) barFillClass = styles.inventoryStockFillAmber;
+                              const productMeta = (products || []).find((p) => Number(p.id) === Number(row.id));
+                              const approvalRaw = productMeta?.approval_status || 'approved';
+                              const statusLower = String(approvalRaw || '').toLowerCase();
+                              let statusPillClass = styles.inventoryStatusLive;
+                              let statusLabel = 'Live';
+                              if (statusLower === 'pending') {
+                                statusPillClass = styles.inventoryStatusPending;
+                                statusLabel = 'Pending';
+                              } else if (statusLower === 'rejected') {
+                                statusPillClass = styles.inventoryStatusRejected;
+                                statusLabel = 'Rejected';
+                              }
+                              const unitPrice = Number(row.unit_price ?? 0);
+                              const unitsSold = Number(row.units_sold ?? 0);
+                              const lineTotal = unitPrice * unitsSold;
+                              return (
+                                <tr
+                                  key={row.id}
+                                  className={styles.inventoryTableRow}
+                                  onClick={() => openProductDetails(row)}
+                                >
+                                  <td>
+                                    <div className={styles.inventoryProductCell}>
+                                      <img
+                                        src={productImageUrl(row.image) || 'https://placehold.co/40x40'}
+                                        alt=""
+                                        width={46}
+                                        height={46}
+                                        className={styles.inventoryProductThumb}
+                                        onError={(e) => { e.target.src = 'https://placehold.co/40x40'; }}
+                                      />
+                                      <div>
+                                        <div className={styles.inventoryProductName}>{row.name}</div>
+                                        <div className={styles.inventoryProductSku}>{formatInventorySku(row.id)}</div>
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className={`${styles.inventoryStatusPill} ${statusPillClass}`}>
+                                      {statusLabel}
+                                    </span>
+                                  </td>
+                                  <td>
+                                    <div className={styles.inventoryStockCell}>
+                                      <div className={styles.inventoryStockBarTrack}>
+                                        <div
+                                          className={`${styles.inventoryStockBarFill} ${barFillClass}`}
+                                          style={{ width: `${fillPct}%` }}
+                                        />
+                                      </div>
+                                      <span className={styles.inventoryStockNum}>{stockNum}</span>
+                                      {stockNum <= 2 ? (
+                                        <span className={styles.inventoryLowTag}>Low</span>
+                                      ) : null}
+                                    </div>
+                                  </td>
+                                  <td>
+                                    <span className={styles.inventoryUnitsSold}>{unitsSold.toLocaleString('en-PH')}</span>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <span className={styles.inventoryPriceMono}>
+                                      ₱
+                                      {unitPrice.toLocaleString('en-PH', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </span>
+                                  </td>
+                                  <td style={{ textAlign: 'right' }}>
+                                    <span className={styles.inventoryPriceMono}>
+                                      ₱
+                                      {lineTotal.toLocaleString('en-PH', {
+                                        minimumFractionDigits: 2,
+                                        maximumFractionDigits: 2,
+                                      })}
+                                    </span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
                           </tbody>
                         </table>
                       </div>
-                    )}
-                  </div>
+                      <div className={styles.inventoryPagination}>
+                        <span className={styles.inventoryPaginationSummary}>
+                          {(() => {
+                            const total = inventoryDisplayRows.length;
+                            if (total === 0) return 'Showing 0 of 0 products';
+                            const from = (inventoryTablePage - 1) * INV_PAGE_SIZE + 1;
+                            const to = Math.min(inventoryTablePage * INV_PAGE_SIZE, total);
+                            return `Showing ${from}–${to} of ${total} products`;
+                          })()}
+                        </span>
+                        <div className={styles.inventoryPaginationControls}>
+                          <button
+                            type="button"
+                            className={styles.inventoryPageBtn}
+                            disabled={inventoryTablePage <= 1}
+                            aria-label="Previous page"
+                            onClick={() => setInventoryTablePage((p) => Math.max(1, p - 1))}
+                          >
+                            ‹
+                          </button>
+                          {Array.from({ length: inventoryPageCount }, (_, i) => i + 1).map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              className={
+                                num === inventoryTablePage
+                                  ? `${styles.inventoryPageBtn} ${styles.inventoryPageBtnActive}`
+                                  : styles.inventoryPageBtn
+                              }
+                              aria-current={num === inventoryTablePage ? 'page' : undefined}
+                              onClick={() => setInventoryTablePage(num)}
+                            >
+                              {num}
+                            </button>
+                          ))}
+                          <button
+                            type="button"
+                            className={styles.inventoryPageBtn}
+                            disabled={inventoryTablePage >= inventoryPageCount}
+                            aria-label="Next page"
+                            onClick={() => setInventoryTablePage((p) => Math.min(inventoryPageCount, p + 1))}
+                          >
+                            ›
+                          </button>
+                        </div>
+                      </div>
+                    </>
+                  )}
                 </div>
-              </>
+              </div>
             )}
 
             {activeTab === 'categories' && (

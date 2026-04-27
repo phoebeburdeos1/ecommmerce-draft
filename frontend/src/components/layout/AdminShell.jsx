@@ -66,7 +66,7 @@ export default function AdminShell({ activeTab, onTabChange, onLogout, children 
                 onClick={() => select(key)}
               >
                 <Icon size={20} strokeWidth={1.5} className={styles.adminNavIcon} aria-hidden />
-                {label}
+                <span className={styles.adminNavLabel}>{label}</span>
               </button>
             ))}
             <Link
@@ -82,7 +82,7 @@ export default function AdminShell({ activeTab, onTabChange, onLogout, children 
                   </span>
                 )}
               </span>
-              Messages
+              <span className={styles.adminNavLabel}>Messages</span>
             </Link>
           </div>
         </div>
